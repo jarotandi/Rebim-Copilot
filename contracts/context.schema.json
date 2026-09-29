@@ -1,59 +1,66 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://rebim.local/schemas/context.schema.json",
-  "title": "ReBIM Context Model",
-  "description": "Normalized BIM context for AI consumption",
+  "$id": "https://rebim.local/contracts/0.1.0/context.schema.json",
+  "title": "ReBIM BIM Context",
+  "description": "Bounded normalized BIM context for AI consumption.",
   "type": "object",
-  "required": ["host", "document", "view", "selection", "revision"],
+  "required": ["protocolVersion", "host", "document", "view", "selection", "revision"],
   "properties": {
-    "host": {
-      "type": "string",
-      "enum": ["revit"]
-    },
+    "protocolVersion": { "const": "0.1.0" },
+    "host": { "type": "string", "enum": ["revit"] },
     "document": {
       "type": "object",
+      "required": ["title", "version"],
       "properties": {
         "title": { "type": "string" },
         "version": { "type": "string" },
         "path": { "type": "string" }
-      }
+      },
+      "additionalProperties": false
     },
     "view": {
       "type": "object",
+      "required": ["id", "name", "type"],
       "properties": {
-        "id": { "type": "string" },
+        "id": { "type": "string", "minLength": 1 },
         "name": { "type": "string" },
         "type": { "type": "string" }
-      }
+      },
+      "additionalProperties": false
     },
     "selection": {
       "type": "array",
+      "maxItems": 100,
       "items": {
         "type": "object",
         "required": ["id", "category"],
         "properties": {
-          "id": { "type": "string" },
+          "id": { "type": "string", "minLength": 1 },
           "category": { "type": "string" },
-          "family": { "type": "string" },
-          "type": { "type": "string" },
-          "level": { "type": "string" },
+          "family": { "type": ["string", "null"] },
+          "type": { "type": ["string", "null"] },
+          "level": { "type": ["string", "null"] },
           "parameters": {
             "type": "object",
             "additionalProperties": {
               "type": "object",
+              "required": ["value"],
               "properties": {
                 "value": {},
                 "unit": { "type": "string" },
-                "type": { "type": "string" }
-              }
+                "storageType": { "type": "string" }
+              },
+              "additionalProperties": false
             }
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "revision": {
       "type": "string",
-      "description": "Context revision hash for stale detection"
+      "pattern": "^[a-f0-9]{16}$"
     }
-  }
+  },
+  "additionalProperties": false
 }

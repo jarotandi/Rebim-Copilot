@@ -45,9 +45,8 @@ export class McpServer {
   }
 
   private setupHandlers(): void {
-    // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      const tools = this.toolRegistry.getTools();
+      const tools = this.toolRegistry.getAllowedTools();
       return {
         tools: tools.map(t => ({
           name: t.name,
@@ -57,30 +56,26 @@ export class McpServer {
       };
     });
 
-    // Call a tool
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      
+
       await this.auditLogger.log('tool_called', {
         tool: name,
         arguments: args
       });
 
       try {
-        // Validate tool exists
         const tool = this.toolRegistry.getTool(name);
         if (!tool) {
           throw new Error(`Unknown tool: ${name}`);
         }
 
-        // Check if tool is allowed in current mode
         if (!this.toolRegistry.isToolAllowed(name)) {
           throw new Error(`Tool ${name} not allowed in current mode`);
         }
 
-        // Execute via IPC
         const response = await this.ipcClient.sendRequest(name, args || {});
-        
+
         if (!response.ok) {
           throw new Error(response.error?.message || 'Tool execution failed');
         }
@@ -113,33 +108,29 @@ export class McpServer {
       }
     });
 
-    // List resources
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-      return {
-        resources: [
-          {
-            uri: 'rebim://project/info',
-            name: 'Project Information',
-            description: 'Current project metadata'
-          },
-          {
-            uri: 'rebim://view/active',
-            name: 'Active View',
-            description: 'Current active view context'
-          },
-          {
-            uri: 'rebim://selection/current',
-            name: 'Current Selection',
-            description: 'Currently selected elements'
-          }
-        ]
-      };
-    });
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: [
+        {
+          uri: 'rebim://project/info',
+          name: 'Project Information',
+          description: 'Current project metadata'
+        },
+        {
+          uri: 'rebim://view/active',
+          name: 'Active View',
+          description: 'Current active view context'
+        },
+        {
+          uri: 'rebim://selection/current',
+          name: 'Current Selection',
+          description: 'Currently selected elements'
+        }
+      ]
+    }));
 
-    // Read resource
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
-      
+
       let command: string;
       if (uri === 'rebim://project/info') {
         command = 'get_project_info';
@@ -152,7 +143,7 @@ export class McpServer {
       }
 
       const response = await this.ipcClient.sendRequest(command, {});
-      
+
       return {
         contents: [{
           uri,

@@ -1,187 +1,49 @@
 /**
- * Tool Registry for ReBIM Copilot
- * Manages available tools, their schemas, and permissions
+ * Tool Registry for ReBIM Copilot.
+ *
+ * RCP-00 makes contracts/tool-registry.json the canonical source.
+ * Do not duplicate tool definitions in TypeScript.
  */
 
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  risk: 'READ' | 'UI' | 'SAFE_WRITE' | 'WRITE' | 'DESTRUCTIVE';
-  modes: string[];
-  parameters: Record<string, unknown>;
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import type { ToolDefinition, ToolMode } from '../contracts/types.js';
+
+interface ToolRegistryDocument {
+  protocolVersion: string;
+  version: string;
+  tools: ToolDefinition[];
+}
+
+function loadCanonicalRegistry(): ToolRegistryDocument {
+  const path = fileURLToPath(
+    new URL('../../../contracts/tool-registry.json', import.meta.url)
+  );
+  return JSON.parse(readFileSync(path, 'utf-8')) as ToolRegistryDocument;
 }
 
 export class ToolRegistry {
   private tools: Map<string, ToolDefinition> = new Map();
-  private currentMode: string = 'Ask';
+  private currentMode: ToolMode = 'Ask';
   private allowedTools: Set<string> = new Set();
 
   constructor() {
-    this.loadDefaultTools();
+    const registry = loadCanonicalRegistry();
+
+    for (const tool of registry.tools) {
+      if (this.tools.has(tool.name)) {
+        throw new Error(`Duplicate canonical tool: ${tool.name}`);
+      }
+      this.tools.set(tool.name, tool);
+    }
+
     this.setMode('Ask');
   }
 
-  private loadDefaultTools(): void {
-    const defaultTools: ToolDefinition[] = [
-      {
-        name: 'get_project_info',
-        description: 'Get project metadata and session info',
-        risk: 'READ',
-        modes: ['Ask', 'Analyze', 'Edit', 'Automate'],
-        parameters: {
-          type: 'object',
-          properties: {}
-        }
-      },
-      {
-        name: 'get_active_view',
-        description: 'Get current active view context',
-        risk: 'READ',
-        modes: ['Ask', 'Analyze', 'Edit', 'Automate'],
-        parameters: {
-          type: 'object',
-          properties: {}
-        }
-      },
-      {
-        name: 'get_selection',
-        description: 'Get currently selected elements',
-        risk: 'READ',
-        modes: ['Ask', 'Analyze', 'Edit', 'Automate'],
-        parameters: {
-          type: 'object',
-          properties: {
-            maxResults: {
-              type: 'number',
-              description: 'Maximum number of elements to return',
-              default: 100
-            }
-          }
-        }
-      },
-      {
-        name: 'get_element',
-        description: 'Get element identity and details',
-        risk: 'READ',
-        modes: ['Ask', 'Analyze', 'Edit', 'Automate'],
-        parameters: {
-          type: 'object',
-          properties: {
-            elementId: {
-              type: 'string',
-              description: 'Element ID'
-            }
-          },
-          required: ['elementId']
-        }
-      },
-      {
-        name: 'get_element_properties',
-        description: 'Get parameter values for an element',
-        risk: 'READ',
-        modes: ['Ask', 'Analyze', 'Edit', 'Automate'],
-        parameters: {
-          type: 'object',
-          properties: {
-            elementId: {
-              type: 'string',
-              description: 'Element ID'
-            }
-          },
-          required: ['elementId']
-        }
-      },
-      {
-        name: 'find_elements',
-        description: 'Search elements with filters',
-        risk: 'READ',
-        modes: ['Analyze', 'Edit', 'Automate'],
-        parameters: {
-          type: 'object',
-          properties: {
-            category: { type: 'string' },
-            family: { type: 'string' },
-            type: { type: 'string' },
-            level: { type: 'string' },
-            maxResults: { type: 'number', default: 50 }
-          }
-        }
-      },
-      {
-        name: 'select_elements',
-        description: 'Select elements by ID',
-        risk: 'UI',
-        modes: ['Ask', 'Analyze', 'Edit', 'Automate'],
-        parameters: {
-          type: 'object',
-          properties: {
-            elementIds: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Array of element IDs'
-            }
-          },
-          required: ['elementIds']
-        }
-      },
-      {
-        name: 'highlight_elements',
-        description: 'Highlight elements visually',
-        risk: 'UI',
-        modes: ['Ask', 'Analyze', 'Edit', 'Automate'],
-        parameters: {
-          type: 'object',
-          properties: {
-            elementIds: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Array of element IDs'
-            }
-          },
-          required: ['elementIds']
-        }
-      },
-      {
-        name: 'set_parameter',
-        description: 'Change one validated parameter (requires approval)',
-        risk: 'SAFE_WRITE',
-        modes: ['Edit', 'Automate'],
-        parameters: {
-          type: 'object',
-          properties: {
-            elementId: {
-              type: 'string',
-              description: 'Element ID'
-            },
-            parameter: {
-              type: 'string',
-              description: 'Parameter name'
-            },
-            value: {
-              description: 'New value'
-            },
-            unit: {
-              type: 'string',
-              description: 'Unit of measurement'
-            },
-            expectedCurrentValue: {
-              description: 'Expected current value for validation'
-            }
-          },
-          required: ['elementId', 'parameter', 'value']
-        }
-      }
-    ];
-
-    for (const tool of defaultTools) {
-      this.tools.set(tool.name, tool);
-    }
-  }
-
-  setMode(mode: string): void {
+  setMode(mode: ToolMode): void {
     this.currentMode = mode;
     this.allowedTools.clear();
-    
+
     for (const [name, tool] of this.tools) {
       if (tool.modes.includes(mode)) {
         this.allowedTools.add(name);
@@ -205,7 +67,7 @@ export class ToolRegistry {
     return Array.from(this.allowedTools).map(name => this.tools.get(name)!);
   }
 
-  getCurrentMode(): string {
+  getCurrentMode(): ToolMode {
     return this.currentMode;
   }
 }

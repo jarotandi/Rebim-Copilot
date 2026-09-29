@@ -1,0 +1,10 @@
+{
+  "protocolVersion": "0.1.0",
+  "requestId": "req-002",
+  "ok": false,
+  "error": {
+    "code": "REBIM_STALE_CONTEXT",
+    "message": "The model changed after preview.",
+    "hint": "Refresh model context and regenerate the proposal."
+  }
+}

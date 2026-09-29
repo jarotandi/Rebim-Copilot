@@ -1,89 +1,171 @@
 {
+  "protocolVersion": "0.1.0",
   "version": "0.1.0",
   "tools": [
     {
       "name": "get_project_info",
       "risk": "READ",
       "modes": ["Ask", "Analyze", "Edit", "Automate"],
-      "description": "Get project metadata and session info",
-      "parameters": {}
+      "description": "Get project metadata and session information.",
+      "mutatesModel": false,
+      "requiresApproval": false,
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "name": "get_active_view",
       "risk": "READ",
       "modes": ["Ask", "Analyze", "Edit", "Automate"],
-      "description": "Get current active view context",
-      "parameters": {}
+      "description": "Get current active view context.",
+      "mutatesModel": false,
+      "requiresApproval": false,
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "name": "get_selection",
       "risk": "READ",
       "modes": ["Ask", "Analyze", "Edit", "Automate"],
-      "description": "Get currently selected elements",
+      "description": "Get currently selected elements with a bounded result count.",
+      "mutatesModel": false,
+      "requiresApproval": false,
       "parameters": {
-        "maxResults": { "type": "number", "default": 100 }
+        "type": "object",
+        "properties": {
+          "maxResults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 100
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
       "name": "get_element",
       "risk": "READ",
       "modes": ["Ask", "Analyze", "Edit", "Automate"],
-      "description": "Get element identity and details",
+      "description": "Get element identity and normalized details.",
+      "mutatesModel": false,
+      "requiresApproval": false,
       "parameters": {
-        "elementId": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "elementId": { "type": "string", "minLength": 1 }
+        },
+        "required": ["elementId"],
+        "additionalProperties": false
       }
     },
     {
       "name": "get_element_properties",
       "risk": "READ",
       "modes": ["Ask", "Analyze", "Edit", "Automate"],
-      "description": "Get parameter values for an element",
+      "description": "Get normalized parameter values for one element.",
+      "mutatesModel": false,
+      "requiresApproval": false,
       "parameters": {
-        "elementId": { "type": "string", "required": true }
+        "type": "object",
+        "properties": {
+          "elementId": { "type": "string", "minLength": 1 }
+        },
+        "required": ["elementId"],
+        "additionalProperties": false
       }
     },
     {
       "name": "find_elements",
       "risk": "READ",
       "modes": ["Analyze", "Edit", "Automate"],
-      "description": "Search elements with filters",
+      "description": "Search elements using bounded filters.",
+      "mutatesModel": false,
+      "requiresApproval": false,
       "parameters": {
-        "category": { "type": "string" },
-        "family": { "type": "string" },
-        "type": { "type": "string" },
-        "level": { "type": "string" },
-        "maxResults": { "type": "number", "default": 50 }
+        "type": "object",
+        "properties": {
+          "category": { "type": "string" },
+          "family": { "type": "string" },
+          "type": { "type": "string" },
+          "level": { "type": "string" },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 50
+          }
+        },
+        "additionalProperties": false
       }
     },
     {
       "name": "select_elements",
       "risk": "UI",
       "modes": ["Ask", "Analyze", "Edit", "Automate"],
-      "description": "Select elements by ID",
+      "description": "Select a bounded set of Revit elements by ID.",
+      "mutatesModel": false,
+      "requiresApproval": false,
       "parameters": {
-        "elementIds": { "type": "array", "items": { "type": "string" } }
+        "type": "object",
+        "properties": {
+          "elementIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "required": ["elementIds"],
+        "additionalProperties": false
       }
     },
     {
       "name": "highlight_elements",
       "risk": "UI",
       "modes": ["Ask", "Analyze", "Edit", "Automate"],
-      "description": "Highlight elements visually",
+      "description": "Temporarily highlight a bounded set of elements.",
+      "mutatesModel": false,
+      "requiresApproval": false,
       "parameters": {
-        "elementIds": { "type": "array", "items": { "type": "string" } }
+        "type": "object",
+        "properties": {
+          "elementIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "required": ["elementIds"],
+        "additionalProperties": false
       }
     },
     {
       "name": "set_parameter",
       "risk": "SAFE_WRITE",
       "modes": ["Edit", "Automate"],
-      "description": "Change one validated parameter (requires approval)",
+      "description": "Propose or execute one validated parameter change after approval.",
+      "mutatesModel": true,
+      "requiresApproval": true,
       "parameters": {
-        "elementId": { "type": "string", "required": true },
-        "parameter": { "type": "string", "required": true },
-        "value": { "required": true },
-        "unit": { "type": "string" },
-        "expectedCurrentValue": {}
+        "type": "object",
+        "properties": {
+          "elementId": { "type": "string", "minLength": 1 },
+          "parameter": { "type": "string", "minLength": 1 },
+          "value": {},
+          "unit": { "type": "string" },
+          "expectedCurrentValue": {}
+        },
+        "required": ["elementId", "parameter", "value"],
+        "additionalProperties": false
       }
     }
   ]
