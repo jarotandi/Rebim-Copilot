@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ToolRegistry } from '../src/tools/registry.js';
+import { ToolRegistry } from '../gateway/src/tools/registry.js';
 
 describe('ToolRegistry', () => {
   let registry: ToolRegistry;
@@ -30,21 +30,17 @@ describe('ToolRegistry', () => {
     expect(tool?.risk).toBe('SAFE_WRITE');
   });
 
-  it('should filter tools by mode', () => {
+  it('should filter tools by Ask mode', () => {
     registry.setMode('Ask');
     const askTools = registry.getAllowedTools();
-    
-    // Ask mode should not have set_parameter
-    const hasSetParam = askTools.some(t => t.name === 'set_parameter');
-    expect(hasSetParam).toBe(false);
+    expect(askTools.some(t => t.name === 'set_parameter')).toBe(false);
+    expect(askTools.some(t => t.name === 'get_selection')).toBe(true);
   });
 
   it('should allow set_parameter in Edit mode', () => {
     registry.setMode('Edit');
     const editTools = registry.getAllowedTools();
-    
-    const hasSetParam = editTools.some(t => t.name === 'set_parameter');
-    expect(hasSetParam).toBe(true);
+    expect(editTools.some(t => t.name === 'set_parameter')).toBe(true);
   });
 
   it('should check if tool is allowed', () => {
@@ -58,12 +54,13 @@ describe('ToolRegistry', () => {
     expect(registry.getCurrentMode()).toBe('Analyze');
   });
 
-  it('should have correct modes for each tool', () => {
-    const tools = registry.getTools();
-    
-    for (const tool of tools) {
-      expect(tool.modes).toContain('Ask');
+  it('should only use canonical modes and require at least one mode', () => {
+    const validModes = ['Ask', 'Analyze', 'Edit', 'Automate'];
+    for (const tool of registry.getTools()) {
       expect(tool.modes.length).toBeGreaterThan(0);
+      for (const mode of tool.modes) {
+        expect(validModes).toContain(mode);
+      }
     }
   });
 
@@ -72,5 +69,7 @@ describe('ToolRegistry', () => {
     expect(tool).toBeDefined();
     expect(tool?.modes).not.toContain('Ask');
     expect(tool?.modes).toContain('Analyze');
+    expect(tool?.modes).toContain('Edit');
+    expect(tool?.modes).toContain('Automate');
   });
 });

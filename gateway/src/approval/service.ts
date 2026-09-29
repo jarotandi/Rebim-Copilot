@@ -3,8 +3,7 @@
  * Manages approval tokens and execution plans for write operations
  */
 
-import { v4 as uuidv4 } from 'crypto';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 export interface ApprovalToken {
   id: string;
@@ -36,16 +35,12 @@ export interface Proposal {
 export class ApprovalService {
   private approvals: Map<string, ApprovalToken> = new Map();
   private proposals: Map<string, Proposal> = new Map();
-  private readonly approvalTimeoutMs: number = 300000; // 5 minutes
+  private readonly approvalTimeoutMs: number = 300000;
 
   constructor() {
-    // Start cleanup interval
     setInterval(() => this.cleanup(), 60000);
   }
 
-  /**
-   * Create a new proposal
-   */
   createProposal(
     tool: string,
     args: Record<string, unknown>,
@@ -68,9 +63,6 @@ export class ApprovalService {
     return proposal;
   }
 
-  /**
-   * Request approval for a proposal
-   */
   requestApproval(proposalId: string): ApprovalToken | null {
     const proposal = this.proposals.get(proposalId);
     if (!proposal) return null;
@@ -88,9 +80,6 @@ export class ApprovalService {
     return token;
   }
 
-  /**
-   * Approve a proposal
-   */
   approve(approvalId: string): boolean {
     const token = this.approvals.get(approvalId);
     if (!token) return false;
@@ -104,9 +93,6 @@ export class ApprovalService {
     return true;
   }
 
-  /**
-   * Reject a proposal
-   */
   reject(approvalId: string): boolean {
     const token = this.approvals.get(approvalId);
     if (!token) return false;
@@ -116,9 +102,6 @@ export class ApprovalService {
     return true;
   }
 
-  /**
-   * Validate approval and create execution plan
-   */
   validateAndCreateExecutionPlan(approvalId: string): ExecutionPlan | null {
     const token = this.approvals.get(approvalId);
     if (!token) return null;
@@ -127,7 +110,6 @@ export class ApprovalService {
     const proposal = this.proposals.get(token.proposalId);
     if (!proposal) return null;
 
-    // Verify proposal hasn't changed
     const currentHash = this.hashProposal(proposal);
     if (currentHash !== token.proposalHash) {
       return null;
@@ -142,22 +124,16 @@ export class ApprovalService {
     };
   }
 
-  /**
-   * Get proposal by ID
-   */
   getProposal(proposalId: string): Proposal | undefined {
     return this.proposals.get(proposalId);
   }
 
-  /**
-   * Get approval by ID
-   */
   getApproval(approvalId: string): ApprovalToken | undefined {
     return this.approvals.get(approvalId);
   }
 
   private generateId(): string {
-    return uuidv4();
+    return randomUUID();
   }
 
   private hashProposal(proposal: Proposal): string {
@@ -173,18 +149,17 @@ export class ApprovalService {
 
   private cleanup(): void {
     const now = new Date();
-    
-    for (const [id, token] of this.approvals) {
+
+    for (const token of this.approvals.values()) {
       if (token.status === 'pending' && now > token.expiresAt) {
         token.status = 'expired';
       }
     }
 
-    // Remove old expired/rejected approvals
     for (const [id, token] of this.approvals) {
       if (token.status === 'expired' || token.status === 'rejected') {
         const age = now.getTime() - token.createdAt.getTime();
-        if (age > 3600000) { // 1 hour
+        if (age > 3600000) {
           this.approvals.delete(id);
         }
       }

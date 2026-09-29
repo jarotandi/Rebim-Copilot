@@ -1,154 +1,96 @@
-# ReBIM Copilot Hybrid - Revit First
+# ReBIM Copilot Hybrid — Revit First
 
-Proof of Concept untuk ReBIM Copilot Hybrid dengan strategi Revit-first. Menghubungkan percakapan natural language dengan konteks BIM dan tool eksekusi yang aman di Autodesk Revit 2025.
+> **Engineering status:** RCP-00R Baseline Recovery is in progress on branch `rcp-00r-baseline-recovery`.
+> The current codebase is an architectural scaffold. No RCP-00…RCP-14 stage is considered sealed until its documented gate has fresh evidence.
 
-## Arsitektur
+ReBIM Copilot Hybrid is a Revit-first proof-of-concept for a safe BIM copilot that combines local/cloud AI, MCP tools, explicit approval, and Autodesk Revit execution.
 
+## Canonical target architecture
+
+```text
+ReBIM Copilot UI
+       |
+       v
+ReBIM AI Gateway
+       |
+       v
+Provider Router
+(Ollama / OpenAI / Anthropic)
+       |
+       v
+ReBIM MCP Tool Layer
+       |
+       v
+Authenticated local IPC
+       |
+       v
+Revit 2025 Add-in
+       |
+       v
+ExternalEvent -> Validation -> Transaction -> Revit API
 ```
-ReBIM Copilot UI (WPF Sidebar)
-       |
-       v
-ReBIM AI Gateway (TypeScript/Node.js)
-       |
-       v
-Provider Router (Ollama / OpenAI / Claude)
-       |
-       v
-ReBIM MCP Server (TypeScript)
-       |
-       v
-Named Pipe IPC
-       |
-       v
-Revit 2025 Add-in (C#/.NET 8)
-       |
-       v
-ExternalEvent -> Transaction -> Revit API
-```
 
-## Komponen
+The scaffold currently contains all of these conceptual layers, but several boundaries are intentionally **not yet production-wired**. In particular, RCP-02 owns the canonical Named Pipe/auth/ExternalEvent path, RCP-07 owns the live sidebar-to-gateway path, and RCP-08+ owns write execution.
 
-### 1. Contracts (`/contracts`)
-- JSON schemas untuk command, result, dan context
-- Tool registry dengan risk classification
-- Error code catalog
+## Current recovery scope
 
-### 2. Revit Add-in (`/addin`)
-- C#/.NET 8 Add-in untuk Revit 2025
-- Named Pipe IPC server
-- Command handler registry
-- ExternalEvent untuk thread-safe Revit API access
+RCP-00R exists to recover a deterministic baseline before feature development:
 
-### 3. AI Gateway (`/gateway`)
-- TypeScript/Node.js gateway server
-- MCP (Model Context Protocol) server
-- Provider router (Ollama, OpenAI, Anthropic)
-- Tool registry dan audit logger
+- make Gateway TypeScript buildable;
+- make tests discoverable and internally consistent;
+- remove known compile blockers in scaffold code;
+- document unresolved runtime boundaries instead of claiming them PASS;
+- add CI for Gateway build/tests;
+- preserve the eBook stage order RCP-00 -> RCP-14.
 
-### 4. UI (`/ui`)
-- WPF Sidebar dengan chat interface
-- Context chips untuk view dan selection
-- Mode selector (Ask/Analyze/Edit/Automate)
-- Provider selector
+See `docs/checkpoints/RCP-00R-BASELINE-RECOVERY.md`.
 
-### 5. Tests (`/tests`)
-- Contract validation tests
-- Tool registry tests
-- IPC communication tests
+## Repository components
 
-## Development Setup
+- `contracts/` — command/result/context schemas, tool registry, error taxonomy.
+- `addin/` — C#/.NET 8 Revit 2025 add-in scaffold.
+- `gateway/` — TypeScript AI/MCP/provider gateway.
+- `ui/` — WPF sidebar scaffold.
+- `tests/` — baseline contract/tool/IPC tests.
 
-### Prerequisites
-- Windows 11
-- Autodesk Revit 2025
-- .NET 8 SDK
-- Node.js 22+
-- Ollama (untuk local AI)
+## Stage map
 
-### Build
+| Stage | Focus | Gate |
+|---|---|---|
+| RCP-00R | Baseline recovery | deterministic scaffold baseline |
+| RCP-00 | Freeze contracts | schema/registry/acceptance PASS |
+| RCP-01 | Revit 2025 Add-in | real add-in loads |
+| RCP-02 | Named Pipe + ExternalEvent | authenticated ping PASS |
+| RCP-03 | get_selection | live selection returned |
+| RCP-04 | BIM context | view/properties real context |
+| RCP-05 | MCP server | Inspector PASS |
+| RCP-06 | Ollama + tools | Local AI -> MCP -> Revit PASS |
+| RCP-07 | Sidebar | end-to-end Ask PASS |
+| RCP-08 | set_parameter dry-run | Preview PASS |
+| RCP-09 | Approval + Transaction | Apply PASS |
+| RCP-10 | Undo / rollback | native Undo PASS |
+| RCP-11 | Hybrid router | provider switching/fallback |
+| RCP-12 | Privacy + snapshot | stale mutation rejected |
+| RCP-13 | Audit + diagnostics | actions traceable |
+| RCP-14 | Fresh E2E | ReBIM Copilot Works in Revit |
+
+## Safety invariants
+
+1. No silent model mutation.
+2. Revit API access must be marshalled onto a valid Revit API context.
+3. Write tools require validation, preview and approval.
+4. Native Revit Transaction/Undo semantics are preserved.
+5. Context revision guards stale proposals.
+6. Provider choice must not bypass tool policy.
+7. Arbitrary code execution is not a normal Copilot capability.
+
+## Baseline development commands
 
 ```bash
-# Build Revit Add-in
-cd addin
-dotnet build
-
-# Build Gateway
 cd gateway
 npm install
 npm run build
+npm test
 ```
 
-### Run
-
-```bash
-# Start Ollama
-ollama serve
-
-# Start Gateway
-cd gateway
-npm run dev
-
-# Load Add-in di Revit 2025
-# Buka Revit -> Ribbon -> ReBIM Copilot -> Open Copilot
-```
-
-## RCP Stages
-
-| Stage | Fokus | Gate |
-|-------|-------|------|
-| RCP-00 | Freeze architecture + schema | Blueprint + contracts PASS |
-| RCP-01 | Revit 2025 Add-in | Add-in loads |
-| RCP-02 | Named Pipe bridge | Ping Revit PASS |
-| RCP-03 | get_selection | Selection returned |
-| RCP-04 | View + properties | Real BIM context |
-| RCP-05 | MCP TS server | Inspector PASS |
-| RCP-06 | Ollama + tools | Local AI -> Revit PASS |
-| RCP-07 | Sidebar + textbox | End-to-end Ask |
-| RCP-08 | set_parameter dry-run | Preview PASS |
-| RCP-09 | Approval + Transaction | Apply PASS |
-| RCP-10 | Undo / rollback | Undo PASS |
-| RCP-11 | Hybrid router | Local/OpenAI/Claude switch |
-| RCP-12 | Privacy + snapshot | Stale mutation rejected |
-| RCP-13 | Audit + diagnostics | All actions traceable |
-| RCP-14 | Fresh E2E verification | Works in Revit |
-
-## Safety Rules
-
-1. **No silent model mutation** - Semua perubahan harus melalui approval
-2. **Tool allowlist** - Hanya tool yang terdaftar yang bisa dipanggil
-3. **Write action validation** - Preview + approval + transaction
-4. **ExternalEvent only** - Revit API hanya dipanggil dari context yang valid
-5. **Native Undo** - Semua perubahan dapat di-undo dengan Ctrl+Z
-6. **Context revision** - Stale context detection untuk mencegah konflik
-
-## Tool Registry
-
-| Tool | Risk | Mode | Deskripsi |
-|------|------|------|-----------|
-| get_project_info | READ | Ask+ | Metadata project/session |
-| get_active_view | READ | Ask+ | Current view context |
-| get_selection | READ | Ask+ | Current selected elements |
-| get_element | READ | Ask+ | Element identity/details |
-| get_element_properties | READ | Ask+ | Parameter values |
-| find_elements | READ | Analyze+ | Filtered search with limits |
-| select_elements | UI | Ask+ | Select returned IDs |
-| highlight_elements | UI | Ask+ | Visual focus |
-| set_parameter | SAFE_WRITE | Edit+ | Change one validated parameter |
-
-## Error Codes
-
-| Code | Makna | Action |
-|------|-------|--------|
-| REBIM_VALIDATION_ERROR | Arguments/schema invalid | Fix request / regenerate |
-| REBIM_CAPABILITY_UNAVAILABLE | Tool unsupported | Switch mode/host |
-| REBIM_PERMISSION_DENIED | Policy blocks action | Request permission |
-| REBIM_STALE_CONTEXT | Model changed after proposal | Refresh and regenerate |
-| REBIM_IPC_UNAVAILABLE | Revit bridge not connected | Reconnect/restart |
-| REBIM_REVIT_CONTEXT_BUSY | Revit not ready | Retry when idle |
-| REBIM_EXECUTION_FAILED | Handler/transaction failed | Show error; rollback |
-| REBIM_PROVIDER_UNAVAILABLE | AI provider unavailable | Fallback if allowed |
-| REBIM_CLOUD_BLOCKED | Privacy policy blocks cloud | Use local provider
-
-## Lisensi
-
-Experimental POC - ReBIM Internal
+Revit runtime verification is intentionally phase-gated and requires Revit 2025 on Windows.

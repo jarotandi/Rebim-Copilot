@@ -5,8 +5,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const contractsPath = join(__dirname, '../contracts');
 
 describe('Command Schema', () => {
@@ -23,10 +26,8 @@ describe('Command Schema', () => {
     expect(schema.properties.host.enum).toEqual(['revit']);
   });
 
-  it('should have correct types', () => {
-    expect(schema.properties.requestId.type).toBe('string');
-    expect(schema.properties.command.type).toBe('string');
-    expect(schema.properties.arguments.type).toBe('object');
+  it('should reject undeclared top-level properties', () => {
+    expect(schema.additionalProperties).toBe(false);
   });
 });
 
@@ -38,8 +39,8 @@ describe('Result Schema', () => {
     expect(schema.required).toContain('ok');
   });
 
-  it('should have correct error codes', () => {
-    const errorCodes = schema.properties.error.properties.error.enum;
+  it('should have canonical error codes', () => {
+    const errorCodes = schema.properties.error.properties.code.enum;
     expect(errorCodes).toContain('REBIM_VALIDATION_ERROR');
     expect(errorCodes).toContain('REBIM_STALE_CONTEXT');
     expect(errorCodes).toContain('REBIM_IPC_UNAVAILABLE');
@@ -91,7 +92,7 @@ describe('Tool Registry', () => {
   });
 
   it('should have set_parameter as SAFE_WRITE', () => {
-    const setParam = registry.tools.find((t: any) => t.name === 'set_parameter');
+    const setParam = registry.tools.find((t: { name: string }) => t.name === 'set_parameter');
     expect(setParam).toBeDefined();
     expect(setParam.risk).toBe('SAFE_WRITE');
   });
