@@ -1,7 +1,7 @@
 # ReBIM Copilot Hybrid — Revit First
 
-> **Engineering status:** RCP-00R Baseline Recovery is in progress on branch `rcp-00r-baseline-recovery`.
-> The current codebase is an architectural scaffold. No RCP-00…RCP-14 stage is considered sealed until its documented gate has fresh evidence.
+> **Latest sealed stage:** RCP-00 Contract Freeze — protocol/contract `0.1.0`.
+> **Next stage:** RCP-01 Revit 2025 Add-in runtime proof. No RCP-01+ runtime stage is considered PASS without fresh stage evidence.
 
 ReBIM Copilot Hybrid is a Revit-first proof-of-concept for a safe BIM copilot that combines local/cloud AI, MCP tools, explicit approval, and Autodesk Revit execution.
 
@@ -30,36 +30,38 @@ Revit 2025 Add-in
 ExternalEvent -> Validation -> Transaction -> Revit API
 ```
 
-The scaffold currently contains all of these conceptual layers, but several boundaries are intentionally **not yet production-wired**. In particular, RCP-02 owns the canonical Named Pipe/auth/ExternalEvent path, RCP-07 owns the live sidebar-to-gateway path, and RCP-08+ owns write execution.
+The repository contains the architectural scaffold, while runtime behavior remains phase-gated. RCP-00 freezes the semantic contracts; RCP-01 proves the real Revit add-in; RCP-02 owns the authenticated Named Pipe + ExternalEvent execution boundary.
 
-## Current recovery scope
+## Current contract baseline
 
-RCP-00R exists to recover a deterministic baseline before feature development:
+Canonical contract set:
 
-- make Gateway TypeScript buildable;
-- make tests discoverable and internally consistent;
-- remove known compile blockers in scaffold code;
-- document unresolved runtime boundaries instead of claiming them PASS;
-- add CI for Gateway build/tests;
-- preserve the eBook stage order RCP-00 -> RCP-14.
+- Protocol: `0.1.0`
+- Contract version: `0.1.0`
+- Status: **FROZEN**
+- Initial host: `revit`
 
-See `docs/checkpoints/RCP-00R-BASELINE-RECOVERY.md`.
+See:
+
+- `contracts/README.md`
+- `docs/architecture/RCP-00-CONTRACT-ACCEPTANCE-MATRIX.md`
+- `docs/checkpoints/RCP-00-CONTRACT-FREEZE.md`
 
 ## Repository components
 
-- `contracts/` — command/result/context schemas, tool registry, error taxonomy.
+- `contracts/` — canonical command/result/context schemas, tool registry, error catalog and fixtures.
 - `addin/` — C#/.NET 8 Revit 2025 add-in scaffold.
 - `gateway/` — TypeScript AI/MCP/provider gateway.
 - `ui/` — WPF sidebar scaffold.
-- `tests/` — baseline contract/tool/IPC tests.
+- `tests/` — contract/tool/IPC baseline verification.
 
 ## Stage map
 
-| Stage | Focus | Gate |
+| Stage | Focus | Status / Gate |
 |---|---|---|
-| RCP-00R | Baseline recovery | deterministic scaffold baseline |
-| RCP-00 | Freeze contracts | schema/registry/acceptance PASS |
-| RCP-01 | Revit 2025 Add-in | real add-in loads |
+| RCP-00R | Baseline recovery | ✅ PASS |
+| RCP-00 | Freeze contracts | ✅ PASS |
+| RCP-01 | Revit 2025 Add-in | NEXT — real add-in loads |
 | RCP-02 | Named Pipe + ExternalEvent | authenticated ping PASS |
 | RCP-03 | get_selection | live selection returned |
 | RCP-04 | BIM context | view/properties real context |
@@ -83,6 +85,7 @@ See `docs/checkpoints/RCP-00R-BASELINE-RECOVERY.md`.
 5. Context revision guards stale proposals.
 6. Provider choice must not bypass tool policy.
 7. Arbitrary code execution is not a normal Copilot capability.
+8. Incompatible changes to frozen contracts require a version bump.
 
 ## Baseline development commands
 
@@ -93,4 +96,4 @@ npm run build
 npm test
 ```
 
-Revit runtime verification is intentionally phase-gated and requires Revit 2025 on Windows.
+Revit runtime verification requires Revit 2025 on Windows and begins at RCP-01.

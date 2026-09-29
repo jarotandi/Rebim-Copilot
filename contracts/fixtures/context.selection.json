@@ -1,0 +1,34 @@
+{
+  "protocolVersion": "0.1.0",
+  "host": "revit",
+  "document": {
+    "title": "ReBIM POC",
+    "version": "Autodesk Revit 2025"
+  },
+  "view": {
+    "id": "1001",
+    "name": "Level 2",
+    "type": "FloorPlan"
+  },
+  "selection": [
+    {
+      "id": "183728",
+      "category": "Doors",
+      "family": "Single Flush",
+      "type": "900x2100",
+      "level": "Level 2",
+      "parameters": {
+        "Width": {
+          "value": 900,
+          "unit": "mm",
+          "storageType": "Double"
+        },
+        "Mark": {
+          "value": "D-12",
+          "storageType": "String"
+        }
+      }
+    }
+  ],
+  "revision": "0123456789abcdef"
+}

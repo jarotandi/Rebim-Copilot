@@ -1,120 +1,165 @@
-/**
- * Contract Tests for ReBIM Copilot
- * Validates JSON schemas and contract compliance
- */
-
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ToolRegistry } from '../gateway/src/tools/registry.js';
+import { REBIM_PROTOCOL_VERSION } from '../gateway/src/contracts/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const contractsPath = join(__dirname, '../contracts');
 
-describe('Command Schema', () => {
-  const schema = JSON.parse(readFileSync(join(contractsPath, 'command.schema.json'), 'utf-8'));
+function json(name: string): any {
+  return JSON.parse(readFileSync(join(contractsPath, name), 'utf-8'));
+}
 
-  it('should have required fields', () => {
-    expect(schema.required).toContain('requestId');
-    expect(schema.required).toContain('host');
-    expect(schema.required).toContain('command');
-    expect(schema.required).toContain('arguments');
+const requireFromGateway = createRequire(new URL('../gateway/package.json', import.meta.url));
+const AjvModule = requireFromGateway('ajv');
+const Ajv = AjvModule.default ?? AjvModule;
+const ajv = new Ajv({ allErrors: true, strict: false });
+
+describe('RCP-00 manifest/version', () => {
+  const manifest = json('manifest.json');
+
+  it('pins protocol and contract versions', () => {
+    expect(manifest.protocolVersion).toBe('0.1.0');
+    expect(manifest.contractVersion).toBe('0.1.0');
+    expect(REBIM_PROTOCOL_VERSION).toBe(manifest.protocolVersion);
+    expect(manifest.hostTargets).toEqual(['revit']);
   });
 
-  it('should have correct host enum', () => {
-    expect(schema.properties.host.enum).toEqual(['revit']);
-  });
-
-  it('should reject undeclared top-level properties', () => {
-    expect(schema.additionalProperties).toBe(false);
-  });
-});
-
-describe('Result Schema', () => {
-  const schema = JSON.parse(readFileSync(join(contractsPath, 'result.schema.json'), 'utf-8'));
-
-  it('should have required fields', () => {
-    expect(schema.required).toContain('requestId');
-    expect(schema.required).toContain('ok');
-  });
-
-  it('should have canonical error codes', () => {
-    const errorCodes = schema.properties.error.properties.code.enum;
-    expect(errorCodes).toContain('REBIM_VALIDATION_ERROR');
-    expect(errorCodes).toContain('REBIM_STALE_CONTEXT');
-    expect(errorCodes).toContain('REBIM_IPC_UNAVAILABLE');
+  it('declares every canonical contract file', () => {
+    for (const file of manifest.files) {
+      expect(() => readFileSync(join(contractsPath, file), 'utf-8')).not.toThrow();
+    }
   });
 });
 
-describe('Context Schema', () => {
-  const schema = JSON.parse(readFileSync(join(contractsPath, 'context.schema.json'), 'utf-8'));
+describe('canonical schemas and fixtures', () => {
+  const validateCommand = ajv.compile(json('command.schema.json'));
+  const validateResult = ajv.compile(json('result.schema.json'));
+  const validateContext = ajv.compile(json('context.schema.json'));
 
-  it('should have required fields', () => {
-    expect(schema.required).toContain('host');
-    expect(schema.required).toContain('document');
-    expect(schema.required).toContain('view');
-    expect(schema.required).toContain('selection');
-    expect(schema.required).toContain('revision');
+  it('accepts canonical get_selection command fixture', () => {
+    expect(validateCommand(json('fixtures/command.get-selection.json'))).toBe(true);
   });
 
-  it('should have selection as array', () => {
-    expect(schema.properties.selection.type).toBe('array');
+  it('accepts canonical success result fixture', () => {
+    expect(validateResult(json('fixtures/result.get-selection.json'))).toBe(true);
+  });
+
+  it('accepts canonical error result fixture', () => {
+    expect(validateResult(json('fixtures/result.error.json'))).toBe(true);
+  });
+
+  it('accepts canonical bounded context fixture', () => {
+    expect(validateContext(json('fixtures/context.selection.json'))).toBe(true);
+  });
+
+  it('rejects success results that also contain error', () => {
+    const invalid = {
+      ...json('fixtures/result.get-selection.json'),
+      error: { code: 'REBIM_EXECUTION_FAILED', message: 'invalid coexistence' }
+    };
+    expect(validateResult(invalid)).toBe(false);
+  });
+
+  it('rejects error results that also contain result', () => {
+    const invalid = {
+      ...json('fixtures/result.error.json'),
+      result: {}
+    };
+    expect(validateResult(invalid)).toBe(false);
+  });
+
+  it('rejects unknown command envelope fields', () => {
+    const invalid = {
+      ...json('fixtures/command.get-selection.json'),
+      hiddenMutation: true
+    };
+    expect(validateCommand(invalid)).toBe(false);
   });
 });
 
-describe('Tool Registry', () => {
-  const registry = JSON.parse(readFileSync(join(contractsPath, 'tool-registry.json'), 'utf-8'));
+describe('tool registry contract', () => {
+  const registryDocument = json('tool-registry.json');
+  const validateRegistry = ajv.compile(json('tool-registry.schema.json'));
 
-  it('should have version', () => {
-    expect(registry.version).toBe('0.1.0');
+  it('validates registry document', () => {
+    expect(validateRegistry(registryDocument)).toBe(true);
   });
 
-  it('should have tools array', () => {
-    expect(Array.isArray(registry.tools)).toBe(true);
-    expect(registry.tools.length).toBeGreaterThan(0);
+  it('uses unique tool names', () => {
+    const names = registryDocument.tools.map((tool: any) => tool.name);
+    expect(new Set(names).size).toBe(names.length);
   });
 
-  it('should have required tool fields', () => {
-    for (const tool of registry.tools) {
-      expect(tool).toHaveProperty('name');
-      expect(tool).toHaveProperty('risk');
-      expect(tool).toHaveProperty('modes');
-      expect(tool).toHaveProperty('description');
+  it('uses valid JSON Schema for every tool input', () => {
+    for (const tool of registryDocument.tools) {
+      expect(() => ajv.compile(tool.parameters)).not.toThrow();
     }
   });
 
-  it('should have correct risk levels', () => {
-    const validRisks = ['READ', 'UI', 'SAFE_WRITE', 'WRITE', 'DESTRUCTIVE'];
-    for (const tool of registry.tools) {
-      expect(validRisks).toContain(tool.risk);
+  it('requires approval for every model mutation', () => {
+    for (const tool of registryDocument.tools) {
+      if (tool.mutatesModel) {
+        expect(tool.requiresApproval).toBe(true);
+        expect(['SAFE_WRITE', 'WRITE', 'DESTRUCTIVE']).toContain(tool.risk);
+      }
     }
   });
 
-  it('should have set_parameter as SAFE_WRITE', () => {
-    const setParam = registry.tools.find((t: { name: string }) => t.name === 'set_parameter');
-    expect(setParam).toBeDefined();
-    expect(setParam.risk).toBe('SAFE_WRITE');
+  it('keeps READ/UI tools non-mutating', () => {
+    for (const tool of registryDocument.tools) {
+      if (tool.risk === 'READ' || tool.risk === 'UI') {
+        expect(tool.mutatesModel).toBe(false);
+        expect(tool.requiresApproval).toBe(false);
+      }
+    }
+  });
+
+  it('keeps set_parameter out of Ask and Analyze', () => {
+    const tool = registryDocument.tools.find((item: any) => item.name === 'set_parameter');
+    expect(tool.risk).toBe('SAFE_WRITE');
+    expect(tool.mutatesModel).toBe(true);
+    expect(tool.requiresApproval).toBe(true);
+    expect(tool.modes).toEqual(['Edit', 'Automate']);
+  });
+
+  it('TypeScript ToolRegistry loads the canonical JSON source', () => {
+    const registry = new ToolRegistry();
+    expect(registry.getTools().map(t => t.name)).toEqual(
+      registryDocument.tools.map((t: any) => t.name)
+    );
+  });
+
+  it('progressively discloses tools by mode', () => {
+    const registry = new ToolRegistry();
+    registry.setMode('Ask');
+    expect(registry.getAllowedTools().some(t => t.name === 'set_parameter')).toBe(false);
+    registry.setMode('Edit');
+    expect(registry.getAllowedTools().some(t => t.name === 'set_parameter')).toBe(true);
   });
 });
 
-describe('Error Codes', () => {
-  const errorCodes = JSON.parse(readFileSync(join(contractsPath, 'error-codes.json'), 'utf-8'));
+describe('error catalog consistency', () => {
+  const catalog = json('error-codes.json');
+  const resultSchema = json('result.schema.json');
+  const validateCatalog = ajv.compile(json('error-codes.schema.json'));
 
-  it('should have version', () => {
-    expect(errorCodes.version).toBe('0.1.0');
+  it('validates error catalog', () => {
+    expect(validateCatalog(catalog)).toBe(true);
   });
 
-  it('should have errors array', () => {
-    expect(Array.isArray(errorCodes.errors)).toBe(true);
-    expect(errorCodes.errors.length).toBeGreaterThan(0);
+  it('uses unique error codes', () => {
+    const codes = catalog.errors.map((error: any) => error.code);
+    expect(new Set(codes).size).toBe(codes.length);
   });
 
-  it('should have required error fields', () => {
-    for (const error of errorCodes.errors) {
-      expect(error).toHaveProperty('code');
-      expect(error).toHaveProperty('message');
-      expect(error).toHaveProperty('action');
-    }
+  it('matches result-schema error enum exactly', () => {
+    const catalogCodes = catalog.errors.map((error: any) => error.code).sort();
+    const schemaCodes = [...resultSchema.properties.error.properties.code.enum].sort();
+    expect(schemaCodes).toEqual(catalogCodes);
   });
 });
