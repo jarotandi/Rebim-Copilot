@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import Ajv from 'ajv/dist/ajv.js';
+import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +14,9 @@ function json(name: string): any {
   return JSON.parse(readFileSync(join(contractsPath, name), 'utf-8'));
 }
 
+const requireFromGateway = createRequire(new URL('../gateway/package.json', import.meta.url));
+const AjvModule = requireFromGateway('ajv');
+const Ajv = AjvModule.default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true, strict: false });
 
 describe('RCP-00 manifest/version', () => {
