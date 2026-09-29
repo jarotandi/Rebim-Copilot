@@ -8,9 +8,33 @@
     <RootNamespace>ReBIM.Revit.Addin</RootNamespace>
     <Version>0.1.0</Version>
     <Description>ReBIM Copilot Hybrid - Revit 2025 Add-in</Description>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- Revit 2025 DLL References - resolved at build time -->
   <ItemGroup>
+    <Reference Include="RevitAPI" Condition="Exists('$(RevitInstallPath)\RevitAPI.dll')">
+      <HintPath>$(RevitInstallPath)\RevitAPI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI" Condition="Exists('$(RevitInstallPath)\RevitAPIUI.dll')">
+      <HintPath>$(RevitInstallPath)\RevitAPIUI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Fallback for local development -->
+  <ItemGroup Condition="'$(RevitInstallPath)' == ''">
     <Reference Include="RevitAPI">
       <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPI.dll</HintPath>
       <Private>false</Private>
@@ -23,6 +47,18 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!-- Ensure XAML files are included -->
+  <ItemGroup>
+    <Page Include="..\ui\Sidebar.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="..\ui\Sidebar.xaml.cs">
+      <DependentUpon>Sidebar.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
 
 </Project>

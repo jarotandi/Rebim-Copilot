@@ -1,8 +1,6 @@
 using System;
-using System.Windows.Controls;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
-using Newtonsoft.Json;
 
 namespace ReBIM.Revit.Addin
 {
@@ -12,25 +10,22 @@ namespace ReBIM.Revit.Addin
     /// </summary>
     public class Application : IExternalApplication
     {
-        private static readonly string AppDataPath = 
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        private static readonly string LogPath = 
-            System.IO.Path.Combine(AppDataPath, "ReBIM", "Copilot", "logs");
-        
-        private IpcServer _ipcServer;
-        private DockablePane _pane;
+        // Stable GUIDs - DO NOT CHANGE
+        public static readonly string AddInId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+        public static readonly string DockablePaneId = "f9e8d7c6-b5a4-4f3e-2d1c-0b9a8f7e6d5c";
+
+        private DockablePane _dockablePane;
 
         public Result OnStartup(UIControlledApplication application)
         {
             try
             {
-                // Initialize logging
-                System.IO.Directory.CreateDirectory(LogPath);
-                Log("ReBIM Copilot Add-in starting...");
+                Logger.Info("ReBIM Copilot Add-in starting...");
 
-                // Create ribbon panel
-                RibbonPanel panel = application.CreateRibbonPanel("ReBIM Copilot");
-                
+                // Create ribbon tab "ReBIM"
+                RibbonPanel panel = application.CreateRibbonPanel("ReBIM", "ReBIM Copilot");
+                Logger.Info("Ribbon panel created: ReBIM Copilot");
+
                 // Add Open Copilot button
                 PushButtonData openBtnData = new PushButtonData(
                     "OpenReBIMCopilot",
@@ -38,6 +33,7 @@ namespace ReBIM.Revit.Addin
                     typeof(Application).Assembly.Location,
                     "ReBIM.Revit.Addin.OpenCopilotCommand");
                 panel.AddItem(openBtnData);
+                Logger.Info("Open Copilot button added");
 
                 // Add Diagnostics button
                 PushButtonData diagBtnData = new PushButtonData(
@@ -46,17 +42,21 @@ namespace ReBIM.Revit.Addin
                     typeof(Application).Assembly.Location,
                     "ReBIM.Revit.Addin.DiagnosticsCommand");
                 panel.AddItem(diagBtnData);
+                Logger.Info("Diagnostics button added");
 
-                // Start IPC server
-                _ipcServer = new IpcServer();
-                _ipcServer.Start();
-                Log("IPC server started");
+                // Register DockablePane
+                _dockablePane = application.RegisterDockablePane(
+                    new DockablePaneId(new Guid(DockablePaneId)),
+                    "ReBIM Copilot",
+                    new DockablePaneProvider());
+                Logger.Info("DockablePane registered");
 
+                Logger.Info("ReBIM Copilot Add-in started successfully");
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
-                Log($"Startup error: {ex.Message}");
+                Logger.Error("Startup failed", ex);
                 return Result.Failed;
             }
         }
@@ -65,23 +65,19 @@ namespace ReBIM.Revit.Addin
         {
             try
             {
-                Log("ReBIM Copilot Add-in shutting down...");
-                _ipcServer?.Stop();
+                Logger.Info("ReBIM Copilot Add-in shutting down...");
+                
+                // DockablePane is automatically unregistered by Revit
+                _dockablePane = null;
+                
+                Logger.Info("ReBIM Copilot Add-in shutdown complete");
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
-                Log($"Shutdown error: {ex.Message}");
+                Logger.Error("Shutdown failed", ex);
                 return Result.Failed;
             }
-        }
-
-        private static void Log(string message)
-        {
-            string logFile = System.IO.Path.Combine(LogPath, 
-                $"rebim_{DateTime.Now:yyyyMMdd}.log");
-            string entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}";
-            System.IO.File.AppendAllText(logFile, entry);
         }
     }
 }
