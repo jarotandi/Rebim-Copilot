@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import Ajv from 'ajv';
+import Ajv from 'ajv/dist/ajv.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
