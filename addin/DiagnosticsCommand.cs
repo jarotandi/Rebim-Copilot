@@ -1,48 +1,60 @@
 using System;
 using System.Text;
+using Autodesk.Revit.Attributes;
 using Autodesk.Revit.UI;
+using Autodesk.Revit.DB;
 
 namespace ReBIM.Revit.Addin
 {
     /// <summary>
     /// Command to show diagnostics information
     /// </summary>
+    [Transaction(TransactionMode.Manual)]
     public class DiagnosticsCommand : IExternalCommand
     {
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             try
             {
-                UIDocument uidoc = commandData.Application.ActiveUIDocument;
-                if (uidoc == null)
-                {
-                    return Result.Failed;
-                }
+                Logger.Info("Diagnostics command executed");
 
+                UIDocument uidoc = commandData.Application.ActiveUIDocument;
+                
                 var sb = new StringBuilder();
                 sb.AppendLine("=== ReBIM Copilot Diagnostics ===");
                 sb.AppendLine();
+                sb.AppendLine($"ReBIM Copilot Version: {typeof(Application).Assembly.GetName().Version}");
                 sb.AppendLine($"Revit Version: {commandData.Application.Application.VersionName}");
-                sb.AppendLine($"Document: {uidoc.Document.Title}");
-                sb.AppendLine($"Active View: {uidoc.ActiveView?.Name}");
+                sb.AppendLine($"Revit Build: {commandData.Application.Application.VersionBuild}");
                 sb.AppendLine();
-                sb.AppendLine("IPC Status: " + (IpcServer.IsRunning ? "Running" : "Stopped"));
+                
+                if (uidoc != null)
+                {
+                    sb.AppendLine($"Active Document: {uidoc.Document.Title}");
+                    sb.AppendLine($"Active View: {uidoc.ActiveView?.Name ?? "None"}");
+                }
+                else
+                {
+                    sb.AppendLine("Active Document: No active document");
+                    sb.AppendLine("Active View: None");
+                }
+                
                 sb.AppendLine();
-                sb.AppendLine("Press OK to copy to clipboard.");
+                sb.AppendLine("Add-in Status: Loaded");
+                sb.AppendLine("DockablePane: Registered");
+                sb.AppendLine("IPC: Not implemented — RCP-02");
 
                 TaskDialog dialog = new TaskDialog("ReBIM Copilot Diagnostics");
                 dialog.MainContent = sb.ToString();
                 dialog.CommonButtons = TaskDialogCommonButtons.Ok;
                 
-                if (dialog.Show() == TaskDialogResult.Ok)
-                {
-                    System.Windows.Clipboard.SetText(sb.ToString());
-                }
+                dialog.Show();
 
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
+                Logger.Error("Diagnostics command failed", ex);
                 message = ex.Message;
                 return Result.Failed;
             }

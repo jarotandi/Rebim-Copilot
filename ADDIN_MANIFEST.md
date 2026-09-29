@@ -8,7 +8,7 @@
   <AddIn Type="Application">
     <Name>ReBIM Copilot</Name>
     <Assembly>ReBIM.Revit.Addin.dll</Assembly>
-    <AddInId>YOUR-GUID-HERE-1234-567890ABCDEF</AddInId>
+    <AddInId>e18ae9d3-e8f8-4ae9-b7ac-80467cad65c6</AddInId>
     <FullClassName>ReBIM.Revit.Addin.Application</FullClassName>
     <VendorId>REBIM</VendorId>
     <VendorDescription>ReBIM Copilot Hybrid - Revit First</VendorDescription>
@@ -16,18 +16,25 @@
 </RevitAddIns>
 ```
 
+## FROZEN GUIDs (generated 2026-09-29)
+
+| Component | GUID |
+|-----------|------|
+| AddInId | `e18ae9d3-e8f8-4ae9-b7ac-80467cad65c6` |
+| DockablePaneId | `d3b005f6-7e7b-4381-83ea-1c7415544db9` |
+
+**DO NOT REGENERATE THESE GUIDS**
+
 ## Installation
 
 1. Build the add-in: `dotnet build -c Release`
-2. Copy `ReBIM.Revit.Addin.dll` dan dependencies ke:
-   - `C:\ProgramData\Autodesk\Revit\Addins\2025\ReBIM.Copilot\`
-3. Copy manifest file ke:
-   - `C:\ProgramData\Autodesk\Revit\Addins\2025\ReBIM.Copilot.addin`
-4. Restart Revit 2025
+2. Run installation script: `.\addin\install.ps1`
+3. Or manually copy files to:
+   - `%AppData%\Autodesk\Revit\Addins\2025\ReBIM.Copilot\`
 
 ## Verification
 
-- Buka Revit 2025
-- Cek ribbon tab "ReBIM Copilot"
-- Klik "Open Copilot" untuk membuka sidebar
-- Klik "Diagnostics" untuk melihat status koneksi
+- Open Revit 2025
+- Check ribbon tab "ReBIM"
+- Click "Open Copilot" to open DockablePane
+- Click "Diagnostics" to view status

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>ReBIM Copilot</Name>
+    <Assembly>ReBIM.Revit.Addin.dll</Assembly>
+    <AddInId>e18ae9d3-e8f8-4ae9-b7ac-80467cad65c6</AddInId>
+    <FullClassName>ReBIM.Revit.Addin.Application</FullClassName>
+    <VendorId>REBIM</VendorId>
+    <VendorDescription>ReBIM Copilot Hybrid - Revit First</VendorDescription>
+  </AddIn>
+</RevitAddIns>

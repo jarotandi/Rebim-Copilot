@@ -1,8 +1,6 @@
 using System;
-using System.Windows.Controls;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
-using Newtonsoft.Json;
 
 namespace ReBIM.Revit.Addin
 {
@@ -12,32 +10,47 @@ namespace ReBIM.Revit.Addin
     /// </summary>
     public class Application : IExternalApplication
     {
-        private static readonly string AppDataPath = 
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        private static readonly string LogPath = 
-            System.IO.Path.Combine(AppDataPath, "ReBIM", "Copilot", "logs");
-        
-        private IpcServer _ipcServer;
-        private DockablePane _pane;
+        // FROZEN GUIDs - DO NOT CHANGE (generated 2026-09-29)
+        public static readonly string AddInId = "e18ae9d3-e8f8-4ae9-b7ac-80467cad65c6";
+        public static readonly string DockablePaneId = "d3b005f6-7e7b-4381-83ea-1c7415544db9";
 
         public Result OnStartup(UIControlledApplication application)
         {
             try
             {
-                // Initialize logging
-                System.IO.Directory.CreateDirectory(LogPath);
-                Log("ReBIM Copilot Add-in starting...");
+                Logger.Info("ReBIM Copilot Add-in starting...");
+
+                // Create or find ribbon tab "ReBIM"
+                try
+                {
+                    application.CreateRibbonTab("ReBIM");
+                    Logger.Info("Ribbon tab 'ReBIM' created");
+                }
+                catch (System.ArgumentException)
+                {
+                    // Tab already exists - continue
+                    Logger.Info("Ribbon tab 'ReBIM' already exists");
+                }
 
                 // Create ribbon panel
-                RibbonPanel panel = application.CreateRibbonPanel("ReBIM Copilot");
-                
+                RibbonPanel panel = application.CreateRibbonPanel("ReBIM", "ReBIM Copilot");
+                Logger.Info("Ribbon panel created: ReBIM Copilot");
+
                 // Add Open Copilot button
                 PushButtonData openBtnData = new PushButtonData(
                     "OpenReBIMCopilot",
                     "Open Copilot",
                     typeof(Application).Assembly.Location,
                     "ReBIM.Revit.Addin.OpenCopilotCommand");
-                panel.AddItem(openBtnData);
+                PushButton openButton = panel.AddItem(openBtnData) as PushButton;
+                if (openButton != null)
+                {
+                    openButton.Image = RibbonImageLoader.Load("Copilot16.png");
+                    openButton.LargeImage = RibbonImageLoader.Load("Copilot32.png");
+                    openButton.ToolTip = "Open ReBIM Copilot";
+                    openButton.LongDescription = "Open the ReBIM Copilot dockable sidebar.";
+                }
+                Logger.Info("Open Copilot button added");
 
                 // Add Diagnostics button
                 PushButtonData diagBtnData = new PushButtonData(
@@ -45,18 +58,29 @@ namespace ReBIM.Revit.Addin
                     "Diagnostics",
                     typeof(Application).Assembly.Location,
                     "ReBIM.Revit.Addin.DiagnosticsCommand");
-                panel.AddItem(diagBtnData);
+                PushButton diagButton = panel.AddItem(diagBtnData) as PushButton;
+                if (diagButton != null)
+                {
+                    diagButton.Image = RibbonImageLoader.Load("Diagnostics16.png");
+                    diagButton.LargeImage = RibbonImageLoader.Load("Diagnostics32.png");
+                    diagButton.ToolTip = "ReBIM Diagnostics";
+                    diagButton.LongDescription = "Show ReBIM Copilot, Revit, document and runtime diagnostics.";
+                }
+                Logger.Info("Diagnostics button added");
 
-                // Start IPC server
-                _ipcServer = new IpcServer();
-                _ipcServer.Start();
-                Log("IPC server started");
+                // Register DockablePane (do not assign to variable)
+                application.RegisterDockablePane(
+                    new DockablePaneId(new Guid(DockablePaneId)),
+                    "ReBIM Copilot",
+                    new DockablePaneProvider());
+                Logger.Info("DockablePane registered");
 
+                Logger.Info("ReBIM Copilot Add-in started successfully");
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
-                Log($"Startup error: {ex.Message}");
+                Logger.Error("Startup failed", ex);
                 return Result.Failed;
             }
         }
@@ -65,23 +89,15 @@ namespace ReBIM.Revit.Addin
         {
             try
             {
-                Log("ReBIM Copilot Add-in shutting down...");
-                _ipcServer?.Stop();
+                Logger.Info("ReBIM Copilot Add-in shutting down...");
+                Logger.Info("ReBIM Copilot Add-in shutdown complete");
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
-                Log($"Shutdown error: {ex.Message}");
+                Logger.Error("Shutdown failed", ex);
                 return Result.Failed;
             }
-        }
-
-        private static void Log(string message)
-        {
-            string logFile = System.IO.Path.Combine(LogPath, 
-                $"rebim_{DateTime.Now:yyyyMMdd}.log");
-            string entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}";
-            System.IO.File.AppendAllText(logFile, entry);
         }
     }
 }

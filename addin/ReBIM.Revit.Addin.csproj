@@ -1,15 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <OutputType>Library</OutputType>
     <AssemblyName>ReBIM.Revit.Addin</AssemblyName>
     <RootNamespace>ReBIM.Revit.Addin</RootNamespace>
     <Version>0.1.0</Version>
     <Description>ReBIM Copilot Hybrid - Revit 2025 Add-in</Description>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- Revit 2025 DLL References -->
   <ItemGroup>
     <Reference Include="RevitAPI">
       <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPI.dll</HintPath>
@@ -23,6 +35,23 @@
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!-- Ensure XAML files are included -->
+  <ItemGroup>
+    <Page Include="..\ui\Sidebar.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="..\ui\Sidebar.xaml.cs">
+      <DependentUpon>Sidebar.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+
+  <!-- Embedded ribbon icons -->
+  <ItemGroup>
+    <Resource Include="Resources\*.png" />
   </ItemGroup>
 
 </Project>

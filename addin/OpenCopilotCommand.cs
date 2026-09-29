@@ -1,34 +1,44 @@
 using System;
+using Autodesk.Revit.Attributes;
 using Autodesk.Revit.UI;
+using Autodesk.Revit.DB;
 
 namespace ReBIM.Revit.Addin
 {
     /// <summary>
-    /// Command to open ReBIM Copilot sidebar
+    /// Command to open ReBIM Copilot DockablePane
     /// </summary>
+    [Transaction(TransactionMode.Manual)]
     public class OpenCopilotCommand : IExternalCommand
     {
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             try
-                {
-                    UIDocument uidoc = commandData.Application.ActiveUIDocument;
-                    if (uidoc == null)
-                    {
-                        return Result.Failed;
-                    }
+            {
+                Logger.Info("Open Copilot command executed");
 
-                    // Show sidebar panel
-                    // In real implementation, this would show the dockable pane
-                    TaskDialog.Show("ReBIM Copilot", "Sidebar opened!");
-                    
-                    return Result.Succeeded;
-                }
-                catch (Exception ex)
+                // Get DockablePane through UIApplication (not UIDocument)
+                var pane = commandData.Application.GetDockablePane(
+                    new DockablePaneId(new Guid(Application.DockablePaneId)));
+
+                if (pane != null)
                 {
-                    message = ex.Message;
-                    return Result.Failed;
+                    pane.Show();
+                    Logger.Info("DockablePane shown");
                 }
+                else
+                {
+                    Logger.Warning("DockablePane not found");
+                }
+
+                return Result.Succeeded;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Open Copilot command failed", ex);
+                message = ex.Message;
+                return Result.Failed;
+            }
         }
     }
 }
