@@ -49,4 +49,9 @@
     </Compile>
   </ItemGroup>
 
+  <!-- Embedded ribbon icons -->
+  <ItemGroup>
+    <Resource Include="Resources\*.png" />
+  </ItemGroup>
+
 </Project>

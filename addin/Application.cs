@@ -42,7 +42,14 @@ namespace ReBIM.Revit.Addin
                     "Open Copilot",
                     typeof(Application).Assembly.Location,
                     "ReBIM.Revit.Addin.OpenCopilotCommand");
-                panel.AddItem(openBtnData);
+                PushButton openButton = panel.AddItem(openBtnData) as PushButton;
+                if (openButton != null)
+                {
+                    openButton.Image = RibbonImageLoader.Load("Copilot16.png");
+                    openButton.LargeImage = RibbonImageLoader.Load("Copilot32.png");
+                    openButton.ToolTip = "Open ReBIM Copilot";
+                    openButton.LongDescription = "Open the ReBIM Copilot dockable sidebar.";
+                }
                 Logger.Info("Open Copilot button added");
 
                 // Add Diagnostics button
@@ -51,7 +58,14 @@ namespace ReBIM.Revit.Addin
                     "Diagnostics",
                     typeof(Application).Assembly.Location,
                     "ReBIM.Revit.Addin.DiagnosticsCommand");
-                panel.AddItem(diagBtnData);
+                PushButton diagButton = panel.AddItem(diagBtnData) as PushButton;
+                if (diagButton != null)
+                {
+                    diagButton.Image = RibbonImageLoader.Load("Diagnostics16.png");
+                    diagButton.LargeImage = RibbonImageLoader.Load("Diagnostics32.png");
+                    diagButton.ToolTip = "ReBIM Diagnostics";
+                    diagButton.LongDescription = "Show ReBIM Copilot, Revit, document and runtime diagnostics.";
+                }
                 Logger.Info("Diagnostics button added");
 
                 // Register DockablePane (do not assign to variable)
