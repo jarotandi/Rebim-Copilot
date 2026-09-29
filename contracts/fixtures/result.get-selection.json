@@ -1,0 +1,16 @@
+{
+  "protocolVersion": "0.1.0",
+  "requestId": "req-001",
+  "ok": true,
+  "result": {
+    "elements": [
+      {
+        "id": "183728",
+        "category": "Doors",
+        "family": "Single Flush",
+        "type": "900x2100",
+        "level": "Level 2"
+      }
+    ]
+  }
+}

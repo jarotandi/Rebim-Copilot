@@ -1,12 +1,12 @@
 /**
  * IPC Client Tests
- * Validates IPC communication with Revit Add-in
+ * Baseline tests only; live Revit/Named-Pipe coverage begins in RCP-02.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { IpcClient } from '../src/ipc/client.js';
+import { IpcClient } from '../gateway/src/ipc/client.js';
 
-describe('IpcClient', () => {
+describe('IpcClient baseline', () => {
   let client: IpcClient;
 
   beforeEach(() => {
@@ -28,7 +28,4 @@ describe('IpcClient', () => {
   it('should throw when sending request while disconnected', async () => {
     await expect(client.sendRequest('ping', {})).rejects.toThrow('IPC not connected');
   });
-
-  // Note: Integration tests with actual Revit connection
-  // would require a running Revit instance with the add-in loaded
 });

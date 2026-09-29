@@ -1,28 +1,46 @@
-# ReBIM Copilot Contracts
+# ReBIM Copilot Contracts v0.1.0
 
-## Overview
-This directory contains the frozen contracts for ReBIM Copilot Hybrid POC.
+RCP-00 freezes the provider-neutral semantic contracts used between the Copilot/Gateway and host adapters.
 
-## Files
+## Canonical version
 
-| File | Description |
-|------|-------------|
-| `command.schema.json` | Command envelope schema |
-| `result.schema.json` | Result envelope schema |
-| `context.schema.json` | BIM context model schema |
-| `tool-registry.json` | Tool registry with risk classification |
-| `error-codes.json` | Error code catalog |
+- Protocol: `0.1.0`
+- Contract set: `0.1.0`
+- Initial host target: `revit`
 
-## Version
-All contracts are at version 0.1.0 (RCP-00 frozen).
+## Boundary rule
 
-## Unit Boundary
-- Length values: millimeters (mm)
-- All unit conversions happen at public boundary
+Transport authentication and Named Pipe framing are **not** part of the semantic command envelope. Those concerns belong to RCP-02.
 
-## Tool Risk Levels
-- READ: Read-only operations
-- UI: User interface operations
-- SAFE_WRITE: Write operations requiring preview + approval
-- WRITE: Direct write operations
-- DESTRUCTIVE: Destructive operations requiring strong confirmation
+The canonical command envelope is:
+
+```text
+protocolVersion
+requestId
+host
+command
+contextRevision?
+arguments
+```
+
+The canonical result envelope is:
+
+```text
+protocolVersion
+requestId
+ok
+result | error
+```
+
+## Safety invariants
+
+- READ/UI tools must not mutate model state.
+- Any tool with `mutatesModel=true` must have `requiresApproval=true`.
+- `set_parameter` is not visible in Ask/Analyze mode.
+- Tool inputs are standard JSON Schema objects.
+- Result error codes must match the canonical error catalog.
+- Unknown top-level envelope fields are rejected.
+
+## Change policy
+
+After RCP-00 is sealed, incompatible changes require a protocol or contract version bump. Do not silently change field meaning under `0.1.0`.

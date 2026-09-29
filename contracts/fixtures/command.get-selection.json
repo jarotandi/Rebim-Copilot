@@ -1,0 +1,10 @@
+{
+  "protocolVersion": "0.1.0",
+  "requestId": "req-001",
+  "host": "revit",
+  "command": "get_selection",
+  "contextRevision": "0123456789abcdef",
+  "arguments": {
+    "maxResults": 25
+  }
+}

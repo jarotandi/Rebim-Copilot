@@ -1,0 +1,15 @@
+{
+  "protocolVersion": "0.1.0",
+  "contractVersion": "0.1.0",
+  "status": "FROZEN",
+  "hostTargets": ["revit"],
+  "files": [
+    "command.schema.json",
+    "result.schema.json",
+    "context.schema.json",
+    "tool-registry.schema.json",
+    "tool-registry.json",
+    "error-codes.schema.json",
+    "error-codes.json"
+  ]
+}

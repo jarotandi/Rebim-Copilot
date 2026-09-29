@@ -1,50 +1,51 @@
 {
+  "protocolVersion": "0.1.0",
   "version": "0.1.0",
   "errors": [
     {
       "code": "REBIM_VALIDATION_ERROR",
-      "message": "Arguments/schema invalid",
-      "action": "Fix request / regenerate"
+      "message": "Arguments or schema are invalid.",
+      "action": "Fix the request or regenerate the proposal."
     },
     {
       "code": "REBIM_CAPABILITY_UNAVAILABLE",
-      "message": "Tool unsupported by current host/mode",
-      "action": "Switch mode/host or advisory only"
+      "message": "The requested tool is unsupported by the current host or mode.",
+      "action": "Switch mode/host or continue in advisory-only mode."
     },
     {
       "code": "REBIM_PERMISSION_DENIED",
-      "message": "Policy/user permission blocks action",
-      "action": "Request permission / use read-only"
+      "message": "Policy or user permission blocks the action.",
+      "action": "Request permission or continue read-only."
     },
     {
       "code": "REBIM_STALE_CONTEXT",
-      "message": "Model changed after proposal",
-      "action": "Refresh and regenerate"
+      "message": "The model changed after the proposal was created.",
+      "action": "Refresh context and regenerate the proposal."
     },
     {
       "code": "REBIM_IPC_UNAVAILABLE",
-      "message": "Revit bridge not connected",
-      "action": "Reconnect/restart bridge"
+      "message": "The Revit bridge is not connected.",
+      "action": "Reconnect or restart the bridge."
     },
     {
       "code": "REBIM_REVIT_CONTEXT_BUSY",
-      "message": "Revit not ready for action",
-      "action": "Retry when idle"
+      "message": "Revit is not ready for the requested action.",
+      "action": "Retry when Revit returns to an executable API context."
     },
     {
       "code": "REBIM_EXECUTION_FAILED",
-      "message": "Handler/transaction failed",
-      "action": "Show error; model should rollback"
+      "message": "A handler or transaction failed.",
+      "action": "Show the failure and preserve or restore model state."
     },
     {
       "code": "REBIM_PROVIDER_UNAVAILABLE",
-      "message": "AI provider unavailable",
-      "action": "Fallback if allowed"
+      "message": "The selected AI provider is unavailable.",
+      "action": "Use an allowed fallback provider."
     },
     {
       "code": "REBIM_CLOUD_BLOCKED",
-      "message": "Privacy policy blocks cloud",
-      "action": "Use local provider"
+      "message": "Privacy policy blocks cloud processing.",
+      "action": "Use a local provider."
     }
   ]
 }
