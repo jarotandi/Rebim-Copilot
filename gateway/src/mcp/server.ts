@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MCP Server for ReBIM Copilot
  * Exposes Revit capabilities as MCP tools/resources
  */
@@ -74,7 +74,7 @@ export class McpServer {
           throw new Error(`Tool ${name} not allowed in current mode`);
         }
 
-        const response = await this.ipcClient.sendRequest(name, args || {});
+        const response = await this.ipcClient.sendBridgeRequest(name, args || {});
 
         if (!response.ok) {
           throw new Error(response.error?.message || 'Tool execution failed');
@@ -142,7 +142,7 @@ export class McpServer {
         throw new Error(`Unknown resource: ${uri}`);
       }
 
-      const response = await this.ipcClient.sendRequest(command, {});
+      const response = await this.ipcClient.sendBridgeRequest(command, {});
 
       return {
         contents: [{
@@ -163,3 +163,4 @@ export class McpServer {
     await this.server.close();
   }
 }
+

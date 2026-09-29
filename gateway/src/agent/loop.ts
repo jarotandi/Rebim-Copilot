@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Agent Loop for ReBIM Copilot
  * Orchestrates AI tool calling with MCP tools
  */
@@ -127,7 +127,7 @@ export class AgentLoop {
 
           // Execute tool via IPC
           try {
-            const result = await this.ipcClient.sendRequest(toolName, toolArgs);
+            const result = await this.ipcClient.sendBridgeRequest(toolName, toolArgs);
             toolCalls.push({
               tool: toolName,
               arguments: toolArgs,
@@ -170,3 +170,4 @@ export class AgentLoop {
     };
   }
 }
+

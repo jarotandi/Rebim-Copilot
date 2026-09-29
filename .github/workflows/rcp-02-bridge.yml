@@ -1,0 +1,32 @@
+name: RCP-02 Bridge CI
+
+on:
+  push:
+    branches:
+      - rcp-02-authenticated-ipc-external-event
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: gateway
+
+      - name: Build
+        run: npm run build
+        working-directory: gateway
+
+      - name: Test
+        run: npm test
+        working-directory: gateway
