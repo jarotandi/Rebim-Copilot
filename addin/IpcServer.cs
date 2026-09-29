@@ -1,8 +1,5 @@
 using System;
-using System.IO;
 using System.IO.Pipes;
-using System.Security.AccessControl;
-using System.Security.Principal;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,29 +8,38 @@ using Newtonsoft.Json;
 namespace ReBIM.Revit.Addin
 {
     /// <summary>
-    /// Named Pipe IPC server for ReBIM Copilot
-    /// Handles communication between Revit Add-in and AI Gateway
+    /// IPC server scaffold for ReBIM Copilot.
+    /// RCP-02 owns the production Named Pipe lifecycle, authentication handshake,
+    /// framing, queueing, and ExternalEvent dispatch.
     /// </summary>
     public class IpcServer
     {
         private const string PipeName = "ReBIM_Copilot_Revit";
         private const int BufferSize = 65536;
-        
+
         private CancellationTokenSource _cts;
         private Task _listenerTask;
         private string _sessionToken;
 
+        public static bool IsRunning { get; private set; }
+
         public void Start()
         {
+            if (IsRunning) return;
+
             _cts = new CancellationTokenSource();
             _sessionToken = GenerateSessionToken();
             _listenerTask = Task.Run(() => ListenAsync(_cts.Token));
+            IsRunning = true;
         }
 
         public void Stop()
         {
+            if (!IsRunning) return;
+
             _cts?.Cancel();
             _listenerTask?.Wait(TimeSpan.FromSeconds(5));
+            IsRunning = false;
         }
 
         private async Task ListenAsync(CancellationToken ct)
@@ -52,15 +58,18 @@ namespace ReBIM.Revit.Addin
                         BufferSize);
 
                     await pipe.WaitForConnectionAsync(ct);
-                    _ = HandleClientAsync(pipe, ct);
+
+                    // RCP-02 will replace this one-request scaffold with framed,
+                    // persistent request handling plus ExternalEvent dispatch.
+                    await HandleClientAsync(pipe, ct);
                 }
                 catch (OperationCanceledException)
                 {
                     break;
                 }
-                catch (Exception ex)
+                catch
                 {
-                    // Log error
+                    // Structured diagnostics are added in RCP-13.
                 }
             }
         }
@@ -70,23 +79,19 @@ namespace ReBIM.Revit.Addin
             try
             {
                 var buffer = new byte[BufferSize];
-                var sb = new StringBuilder();
+                int bytesRead = await pipe.ReadAsync(buffer, 0, BufferSize, ct);
+                if (bytesRead <= 0) return;
 
-                int bytesRead;
-                while ((bytesRead = await pipe.ReadAsync(buffer, 0, BufferSize, ct)) > 0)
-                {
-                    sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
-                }
-
-                string requestJson = sb.ToString();
-                string responseJson = ProcessRequest(requestJson);
+                string requestJson = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                string responseJson = ProcessRequest(requestJson) + "\n";
 
                 byte[] responseBytes = Encoding.UTF8.GetBytes(responseJson);
                 await pipe.WriteAsync(responseBytes, 0, responseBytes.Length, ct);
+                await pipe.FlushAsync(ct);
             }
-            catch (Exception ex)
+            catch
             {
-                // Log error
+                // Structured diagnostics are added in RCP-13.
             }
         }
 
@@ -95,15 +100,17 @@ namespace ReBIM.Revit.Addin
             try
             {
                 var request = JsonConvert.DeserializeObject<IpcRequest>(requestJson);
-                
-                // Validate session token
+
                 if (request?.Token != _sessionToken)
                 {
-                    return CreateErrorResponse(request?.RequestId, "REBIM_PERMISSION_DENIED", 
+                    return CreateErrorResponse(
+                        request?.RequestId,
+                        "REBIM_PERMISSION_DENIED",
                         "Invalid session token");
                 }
 
-                // Process command
+                // IMPORTANT: this direct execution path is scaffold-only.
+                // RCP-02 must marshal every Revit API operation via ExternalEvent.
                 var result = CommandHandler.Execute(request.Command, request.Parameters);
                 return JsonConvert.SerializeObject(new IpcResponse
                 {

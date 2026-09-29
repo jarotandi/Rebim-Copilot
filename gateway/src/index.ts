@@ -23,7 +23,7 @@ export class ReBIMGateway {
   private ipcClient: IpcClient;
   private auditLogger: AuditLogger;
   private toolRegistry: ToolRegistry;
-  private config: GatewayConfig;
+  private config: Required<GatewayConfig>;
 
   constructor(config: GatewayConfig = {}) {
     this.config = {
@@ -37,22 +37,24 @@ export class ReBIMGateway {
     this.auditLogger = new AuditLogger();
     this.toolRegistry = new ToolRegistry();
     this.ipcClient = new IpcClient();
-    this.providerRouter = new ProviderRouter(this.config);
+    this.providerRouter = new ProviderRouter({
+      defaultProvider: this.config.defaultProvider,
+      privacyMode: this.config.privacyMode
+    });
     this.mcpServer = new McpServer(this.toolRegistry, this.ipcClient, this.auditLogger);
   }
 
   async start(): Promise<void> {
     console.log('Starting ReBIM Copilot Gateway...');
-    
-    // Connect to Revit IPC
+
+    // RCP-02 owns replacement of the current transport scaffold with the
+    // canonical authenticated Named Pipe implementation.
     await this.ipcClient.connect();
     console.log('Connected to Revit IPC');
 
-    // Start MCP server
     await this.mcpServer.start();
     console.log('MCP Server started');
 
-    // Start provider health checks
     this.providerRouter.startHealthChecks();
     console.log('Provider health checks started');
 
@@ -76,10 +78,9 @@ export class ReBIMGateway {
   }
 }
 
-// CLI entry point
 if (import.meta.url === `file://${process.argv[1]}`) {
   const gateway = new ReBIMGateway();
-  
+
   gateway.start().catch(console.error);
 
   process.on('SIGINT', async () => {
