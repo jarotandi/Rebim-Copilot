@@ -1,9 +1,10 @@
 # RCP-00R — Baseline Recovery
 
-**Status:** IN PROGRESS  
+**Status:** PASS — READY FOR REVIEW / MERGE  
 **Repository:** `jarotandi/Rebim-Copilot`  
 **Branch:** `rcp-00r-baseline-recovery`  
 **Starting SHA:** `e02d7ad58deeadf7cc47c2681dcecb369a5a9f5a`  
+**Verified implementation SHA:** `2ffb1aba4a881cd438e5dc6d3b9224dcc1d76d13`  
 **Purpose:** recover a deterministic engineering baseline before RCP-00 is sealed.
 
 ## 1. Why this recovery exists
@@ -45,34 +46,58 @@ RCP-00R must not:
 10. Gateway configuration type was not strict enough for `ProviderRouter`.
 11. Diagnostics referenced `IpcServer.IsRunning` before the property existed.
 
-## 4. Recovery changes
+## 4. Recovery changes completed
 
-- fix Gateway configuration typing;
-- use `crypto.randomUUID()` in approval service;
-- make root test suite discoverable from the Gateway package;
-- correct schema assertion for error-code enum;
-- correct tool-registry test contradiction;
-- correct test imports to Gateway source;
-- add explicit `IpcServer.IsRunning` state;
-- make the pipe scaffold process one request deterministically instead of disposing a fire-and-forget client handler immediately;
-- add GitHub Actions Gateway baseline verification;
-- mark RCP-02 transport/auth/ExternalEvent work explicitly deferred.
+- fixed Gateway configuration typing;
+- replaced invalid approval ID generation with `crypto.randomUUID()`;
+- made the root test suite discoverable from the Gateway package;
+- corrected result-schema error-code assertion;
+- removed contradictory tool-registry assertions;
+- corrected test imports to Gateway source;
+- added explicit `IpcServer.IsRunning` state;
+- made the pipe scaffold process one request deterministically instead of disposing a fire-and-forget handler immediately;
+- added GitHub Actions Gateway baseline verification;
+- documented that production IPC/auth/ExternalEvent remains owned by RCP-02;
+- corrected repository status wording so scaffold presence is not confused with sealed implementation.
 
-## 5. RCP-00R acceptance gate
+## 5. Verification evidence
 
-Required before sealing:
+GitHub Actions ran against implementation SHA `2ffb1aba4a881cd438e5dc6d3b9224dcc1d76d13`.
 
-- [ ] Gateway dependency install succeeds on clean CI runner.
-- [ ] `npm run build` PASS.
-- [ ] `npm test` PASS and discovers the intended tests.
-- [ ] No test contains contradictory assertions.
-- [ ] Known RCP-02/RCP-07/RCP-08+ runtime gaps are documented.
-- [ ] No later RCP stage is represented as sealed.
-- [ ] Branch diff is limited to baseline recovery.
-- [ ] Final SHA recorded.
-- [ ] Working branch is ready for review/merge.
+### Push workflow
 
-## 6. Deferred to next stages
+- Run: `36568285852`
+- Conclusion: **SUCCESS**
+- Node: `v22.23.2`
+- TypeScript build: **PASS**
+- Test files: **3/3 PASS**
+- Tests: **27/27 PASS**
+
+### Pull-request workflow
+
+- Run: `36568335359`
+- Conclusion: **SUCCESS**
+- Same head SHA: `2ffb1aba4a881cd438e5dc6d3b9224dcc1d76d13`
+
+### Test breakdown
+
+- `contracts.test.ts`: 15/15 PASS
+- `tool-registry.test.ts`: 9/9 PASS
+- `ipc.test.ts`: 3/3 PASS
+
+## 6. RCP-00R acceptance gate
+
+- [x] Gateway dependency install succeeds on clean CI runner.
+- [x] `npm run build` PASS.
+- [x] `npm test` PASS and discovers the intended tests.
+- [x] No test contains contradictory assertions.
+- [x] Known RCP-02/RCP-07/RCP-08+ runtime gaps are documented.
+- [x] No later RCP stage is represented as sealed.
+- [x] Branch diff is limited to baseline recovery.
+- [x] Verified implementation SHA recorded.
+- [x] Working branch is ready for review/merge.
+
+## 7. Deferred to next stages
 
 ### RCP-00
 Freeze canonical command/result/context contracts and remove contract duplication/drift.
@@ -83,6 +108,36 @@ Prove a real Revit 2025 add-in load, ribbon, dockable pane, diagnostics and clea
 ### RCP-02
 Replace transport scaffold with canonical authenticated Named Pipe + queue + ExternalEvent execution.
 
-## 7. STOP boundary
+## 8. Seal statement
 
-Do not start RCP-00 feature/contract freeze until RCP-00R CI evidence is green.
+```text
+RCP-00R BASELINE RECOVERY
+
+START:
+e02d7ad58deeadf7cc47c2681dcecb369a5a9f5a
+
+VERIFIED IMPLEMENTATION:
+2ffb1aba4a881cd438e5dc6d3b9224dcc1d76d13
+
+GATEWAY BUILD:
+PASS
+
+TESTS:
+27 / 27 PASS
+
+PUSH CI:
+PASS
+
+PR CI:
+PASS
+
+RCP-01+ RUNTIME CLAIMS:
+NONE
+
+STATUS:
+PASS — READY FOR REVIEW / MERGE
+```
+
+## 9. STOP boundary
+
+RCP-00R is complete. Do not begin RCP-00 contract freeze on this branch. Start RCP-00 from the reviewed/merged recovery baseline in a new stage branch.
