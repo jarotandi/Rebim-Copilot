@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Autodesk.Revit.Attributes;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
 
@@ -8,6 +9,7 @@ namespace ReBIM.Revit.Addin
     /// <summary>
     /// Command to show diagnostics information
     /// </summary>
+    [Transaction(TransactionMode.Manual)]
     public class DiagnosticsCommand : IExternalCommand
     {
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)

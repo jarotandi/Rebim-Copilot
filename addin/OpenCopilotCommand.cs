@@ -1,4 +1,5 @@
 using System;
+using Autodesk.Revit.Attributes;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
 
@@ -7,6 +8,7 @@ namespace ReBIM.Revit.Addin
     /// <summary>
     /// Command to open ReBIM Copilot DockablePane
     /// </summary>
+    [Transaction(TransactionMode.Manual)]
     public class OpenCopilotCommand : IExternalCommand
     {
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
