@@ -2,16 +2,20 @@
 # Targets: %AppData%\Autodesk\Revit\Addins\2025\
 
 param(
-    [string]$BuildPath = "..\addin\bin\Release\net8.0",
     [switch]$Uninstall
 )
 
 $ErrorActionPreference = "Stop"
 
 $AddInName = "ReBIM.Revit.Addin"
-$AddInGuid = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
 $TargetDir = Join-Path $env:APPDATA "Autodesk\Revit\Addins\2025\ReBIM.Copilot"
 $ManifestName = "ReBIM.Revit.Addin.addin"
+
+# Resolve paths based on script location
+$ScriptDir = $PSScriptRoot
+$RepoRoot = Split-Path -Parent $ScriptDir
+$BuildPath = Join-Path $ScriptDir "bin\Release\net8.0-windows"
+$SourceManifest = Join-Path $RepoRoot $ManifestName
 
 function Write-Status {
     param([string]$Message)
@@ -30,6 +34,22 @@ function Write-Error {
 
 function Install-AddIn {
     Write-Status "Installing ReBIM Copilot Add-in..."
+    Write-Status "Script directory: $ScriptDir"
+    Write-Status "Build path: $BuildPath"
+    Write-Status "Source manifest: $SourceManifest"
+    
+    # Verify source files exist
+    $sourceDll = Join-Path $BuildPath "$AddInName.dll"
+    if (-not (Test-Path $sourceDll)) {
+        Write-Error "Source DLL not found: $sourceDll"
+        Write-Error "Please build the add-in first: dotnet build -c Release"
+        exit 1
+    }
+    
+    if (-not (Test-Path $SourceManifest)) {
+        Write-Error "Manifest not found: $SourceManifest"
+        exit 1
+    }
     
     # Create target directory
     if (-not (Test-Path $TargetDir)) {
@@ -38,28 +58,20 @@ function Install-AddIn {
     }
     
     # Copy DLL
-    $sourceDll = Join-Path $BuildPath "$AddInName.dll"
     $targetDll = Join-Path $TargetDir "$AddInName.dll"
+    Copy-Item -Path $sourceDll -Destination $targetDll -Force
+    Write-Success "Copied: $AddInName.dll"
     
-    if (Test-Path $sourceDll) {
-        Copy-Item -Path $sourceDll -Destination $targetDll -Force
-        Write-Success "Copied: $AddInName.dll"
-    } else {
-        Write-Error "Source DLL not found: $sourceDll"
-        exit 1
-    }
+    # Copy manifest and update assembly path
+    $targetManifest = Join-Path $TargetDir $ManifestName
+    $manifestContent = Get-Content $SourceManifest -Raw
     
-    # Copy manifest
-    $sourceManifest = Join-Path $PSScriptRoot $ManifestName
-    $targetManifest = Join-Path $TargetDir "$ManifestName"
+    # Update assembly path in manifest to point to installed location
+    $assemblyPath = $targetDll.Replace('\', '\\')
+    $manifestContent = $manifestContent -replace '(?<=<Assembly>).*?(?=</Assembly>)', $assemblyPath
     
-    if (Test-Path $sourceManifest) {
-        Copy-Item -Path $sourceManifest -Destination $targetManifest -Force
-        Write-Success "Copied: $ManifestName"
-    } else {
-        Write-Error "Manifest not found: $sourceManifest"
-        exit 1
-    }
+    Set-Content -Path $targetManifest -Value $manifestContent -Encoding UTF8
+    Write-Success "Copied: $ManifestName (with updated assembly path)"
     
     Write-Success "Installation complete!"
     Write-Status "Target: $TargetDir"

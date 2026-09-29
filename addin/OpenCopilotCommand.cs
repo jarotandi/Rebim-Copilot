@@ -1,5 +1,6 @@
 using System;
 using Autodesk.Revit.UI;
+using Autodesk.Revit.DB;
 
 namespace ReBIM.Revit.Addin
 {
@@ -14,19 +15,13 @@ namespace ReBIM.Revit.Addin
             {
                 Logger.Info("Open Copilot command executed");
 
-                UIDocument uidoc = commandData.Application.ActiveUIDocument;
-                if (uidoc == null)
-                {
-                    return Result.Failed;
-                }
+                // Get DockablePane through UIApplication (not UIDocument)
+                var pane = commandData.Application.GetDockablePane(
+                    new DockablePaneId(new Guid(Application.DockablePaneId)));
 
-                // Find and show the DockablePane
-                DockablePane pane = new DockablePaneId(new Guid(Application.DockablePaneId));
-                DockablePane dockablePane = uidoc.GetDockablePane(pane);
-
-                if (dockablePane != null)
+                if (pane != null)
                 {
-                    dockablePane.Show();
+                    pane.Show();
                     Logger.Info("DockablePane shown");
                 }
                 else

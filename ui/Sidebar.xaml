@@ -13,6 +13,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -42,7 +43,8 @@
                          Background="#3C3C3C"
                          Foreground="White"
                          BorderBrush="#007ACC"
-                         Padding="5">
+                         Padding="5"
+                         IsEnabled="False">
                     <ComboBoxItem Content="Ask"/>
                     <ComboBoxItem Content="Analyze"/>
                     <ComboBoxItem Content="Edit"/>
@@ -63,7 +65,7 @@
         <Border Grid.Row="4" Background="#252526" Padding="10" BorderBrush="#3E3E42" BorderThickness="0,0,0,1">
             <StackPanel>
                 <TextBlock Text="Current View" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
-                <TextBlock x:Name="ViewText" Text="..." Foreground="White" FontSize="13"/>
+                <TextBlock x:Name="ViewText" Text="Available in RCP-03/RCP-04" Foreground="#6E6E6E" FontSize="13" FontStyle="Italic"/>
             </StackPanel>
         </Border>
 
@@ -71,12 +73,22 @@
         <Border Grid.Row="5" Background="#252526" Padding="10" BorderBrush="#3E3E42" BorderThickness="0,0,0,1">
             <StackPanel>
                 <TextBlock Text="Selection" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
-                <TextBlock x:Name="SelectionText" Text="..." Foreground="White" FontSize="13"/>
+                <TextBlock x:Name="SelectionText" Text="Available in RCP-03" Foreground="#6E6E6E" FontSize="13" FontStyle="Italic"/>
             </StackPanel>
         </Border>
 
+        <!-- Info Message -->
+        <Border Grid.Row="6" Background="#252526" Padding="10" BorderBrush="#3E3E42" BorderThickness="0,0,0,1">
+            <TextBlock Text="AI integration will be available in RCP-06+&#x0a;IPC will be available in RCP-02" 
+                      Foreground="#6E6E6E" 
+                      FontSize="11" 
+                      TextWrapping="Wrap"
+                      TextAlignment="Center"
+                      Margin="10"/>
+        </Border>
+
         <!-- Input Area -->
-        <Border Grid.Row="6" Background="#252526" Padding="10">
+        <Border Grid.Row="7" Background="#252526" Padding="10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -92,7 +104,8 @@
                         Foreground="White"
                         BorderBrush="#007ACC"
                         Padding="5"
-                        VerticalAlignment="Center"/>
+                        VerticalAlignment="Center"
+                        IsEnabled="False"/>
                 <Button x:Name="SendButton" 
                        Grid.Column="1"
                        Content="Send" 
@@ -103,7 +116,7 @@
                        Foreground="White"
                        BorderBrush="#007ACC"
                        VerticalAlignment="Center"
-                       Click="SendButton_Click"/>
+                       IsEnabled="False"/>
             </Grid>
         </Border>
     </Grid>

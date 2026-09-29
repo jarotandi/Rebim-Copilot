@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using Autodesk.Revit.UI;
 
 namespace ReBIM.Revit.Addin
@@ -26,7 +27,7 @@ namespace ReBIM.Revit.Addin
                 data.InitialState = new DockablePaneState
                 {
                     DockPosition = DockPosition.Tabbed,
-                    TabBehind = DockablePaneState.RevitDefaultTab
+                    TabBehind = DockablePanes.BuiltInDockablePanes.ProjectBrowser
                 };
 
                 Logger.Info("DockablePane setup complete");

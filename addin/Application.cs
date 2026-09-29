@@ -10,11 +10,9 @@ namespace ReBIM.Revit.Addin
     /// </summary>
     public class Application : IExternalApplication
     {
-        // Stable GUIDs - DO NOT CHANGE
-        public static readonly string AddInId = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
-        public static readonly string DockablePaneId = "f9e8d7c6-b5a4-4f3e-2d1c-0b9a8f7e6d5c";
-
-        private DockablePane _dockablePane;
+        // FROZEN GUIDs - DO NOT CHANGE (generated 2026-09-29)
+        public static readonly string AddInId = "e18ae9d3-e8f8-4ae9-b7ac-80467cad65c6";
+        public static readonly string DockablePaneId = "d3b005f6-7e7b-4381-83ea-1c7415544db9";
 
         public Result OnStartup(UIControlledApplication application)
         {
@@ -22,7 +20,19 @@ namespace ReBIM.Revit.Addin
             {
                 Logger.Info("ReBIM Copilot Add-in starting...");
 
-                // Create ribbon tab "ReBIM"
+                // Create or find ribbon tab "ReBIM"
+                try
+                {
+                    application.CreateRibbonTab("ReBIM");
+                    Logger.Info("Ribbon tab 'ReBIM' created");
+                }
+                catch (System.ArgumentException)
+                {
+                    // Tab already exists - continue
+                    Logger.Info("Ribbon tab 'ReBIM' already exists");
+                }
+
+                // Create ribbon panel
                 RibbonPanel panel = application.CreateRibbonPanel("ReBIM", "ReBIM Copilot");
                 Logger.Info("Ribbon panel created: ReBIM Copilot");
 
@@ -44,8 +54,8 @@ namespace ReBIM.Revit.Addin
                 panel.AddItem(diagBtnData);
                 Logger.Info("Diagnostics button added");
 
-                // Register DockablePane
-                _dockablePane = application.RegisterDockablePane(
+                // Register DockablePane (do not assign to variable)
+                application.RegisterDockablePane(
                     new DockablePaneId(new Guid(DockablePaneId)),
                     "ReBIM Copilot",
                     new DockablePaneProvider());
@@ -66,10 +76,6 @@ namespace ReBIM.Revit.Addin
             try
             {
                 Logger.Info("ReBIM Copilot Add-in shutting down...");
-                
-                // DockablePane is automatically unregistered by Revit
-                _dockablePane = null;
-                
                 Logger.Info("ReBIM Copilot Add-in shutdown complete");
                 return Result.Succeeded;
             }

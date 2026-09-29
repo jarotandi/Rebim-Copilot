@@ -8,7 +8,7 @@
   <AddIn Type="Application">
     <Name>ReBIM Copilot</Name>
     <Assembly>ReBIM.Revit.Addin.dll</Assembly>
-    <AddInId>a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d</AddInId>
+    <AddInId>e18ae9d3-e8f8-4ae9-b7ac-80467cad65c6</AddInId>
     <FullClassName>ReBIM.Revit.Addin.Application</FullClassName>
     <VendorId>REBIM</VendorId>
     <VendorDescription>ReBIM Copilot Hybrid - Revit First</VendorDescription>
@@ -16,12 +16,14 @@
 </RevitAddIns>
 ```
 
-## Stable GUIDs
+## FROZEN GUIDs (generated 2026-09-29)
 
 | Component | GUID |
 |-----------|------|
-| AddInId | `a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d` |
-| DockablePaneId | `f9e8d7c6-b5a4-4f3e-2d1c-0b9a8f7e6d5c` |
+| AddInId | `e18ae9d3-e8f8-4ae9-b7ac-80467cad65c6` |
+| DockablePaneId | `d3b005f6-7e7b-4381-83ea-1c7415544db9` |
+
+**DO NOT REGENERATE THESE GUIDS**
 
 ## Installation
 

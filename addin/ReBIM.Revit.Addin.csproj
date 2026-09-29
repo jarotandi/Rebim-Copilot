@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <OutputType>Library</OutputType>
     <AssemblyName>ReBIM.Revit.Addin</AssemblyName>
@@ -21,20 +21,8 @@
     <Optimize>true</Optimize>
   </PropertyGroup>
 
-  <!-- Revit 2025 DLL References - resolved at build time -->
+  <!-- Revit 2025 DLL References -->
   <ItemGroup>
-    <Reference Include="RevitAPI" Condition="Exists('$(RevitInstallPath)\RevitAPI.dll')">
-      <HintPath>$(RevitInstallPath)\RevitAPI.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="RevitAPIUI" Condition="Exists('$(RevitInstallPath)\RevitAPIUI.dll')">
-      <HintPath>$(RevitInstallPath)\RevitAPIUI.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-  </ItemGroup>
-
-  <!-- Fallback for local development -->
-  <ItemGroup Condition="'$(RevitInstallPath)' == ''">
     <Reference Include="RevitAPI">
       <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPI.dll</HintPath>
       <Private>false</Private>
