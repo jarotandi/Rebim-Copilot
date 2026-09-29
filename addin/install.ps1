@@ -8,7 +8,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 $AddInName = "ReBIM.Revit.Addin"
-$TargetDir = Join-Path $env:APPDATA "Autodesk\Revit\Addins\2025\ReBIM.Copilot"
 $ManifestName = "ReBIM.Revit.Addin.addin"
 
 # Resolve paths based on script location
@@ -16,6 +15,11 @@ $ScriptDir = $PSScriptRoot
 $RepoRoot = Split-Path -Parent $ScriptDir
 $BuildPath = Join-Path $ScriptDir "bin\Release\net8.0-windows"
 $SourceManifest = Join-Path $RepoRoot $ManifestName
+
+# Target installation layout
+$AddinsRoot = Join-Path $env:APPDATA "Autodesk\Revit\Addins\2025"
+$TargetDir = Join-Path $AddinsRoot "ReBIM.Copilot"
+$TargetManifest = Join-Path $AddinsRoot $ManifestName
 
 function Write-Status {
     param([string]$Message)
@@ -37,6 +41,8 @@ function Install-AddIn {
     Write-Status "Script directory: $ScriptDir"
     Write-Status "Build path: $BuildPath"
     Write-Status "Source manifest: $SourceManifest"
+    Write-Status "Target manifest: $TargetManifest"
+    Write-Status "Target DLL directory: $TargetDir"
     
     # Verify source files exist
     $sourceDll = Join-Path $BuildPath "$AddInName.dll"
@@ -51,41 +57,50 @@ function Install-AddIn {
         exit 1
     }
     
-    # Create target directory
+    # Create target directory for DLL
     if (-not (Test-Path $TargetDir)) {
         New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
         Write-Status "Created directory: $TargetDir"
     }
     
-    # Copy DLL
+    # Copy DLL to ReBIM.Copilot subdirectory
     $targetDll = Join-Path $TargetDir "$AddInName.dll"
     Copy-Item -Path $sourceDll -Destination $targetDll -Force
-    Write-Success "Copied: $AddInName.dll"
+    Write-Success "Copied: $targetDll"
     
-    # Copy manifest and update assembly path
-    $targetManifest = Join-Path $TargetDir $ManifestName
+    # Copy manifest to Addins root and update assembly path
     $manifestContent = Get-Content $SourceManifest -Raw
     
-    # Update assembly path in manifest to point to installed location
-    $assemblyPath = $targetDll.Replace('\', '\\')
-    $manifestContent = $manifestContent -replace '(?<=<Assembly>).*?(?=</Assembly>)', $assemblyPath
+    # Update assembly path in manifest to point to installed DLL location
+    # Use actual Windows path (no XML escaping needed for backslashes)
+    $manifestContent = $manifestContent -replace '(?<=<Assembly>).*?(?=</Assembly>)', $targetDll
     
-    Set-Content -Path $targetManifest -Value $manifestContent -Encoding UTF8
-    Write-Success "Copied: $ManifestName (with updated assembly path)"
+    Set-Content -Path $TargetManifest -Value $manifestContent -Encoding UTF8
+    Write-Success "Copied: $TargetManifest (with updated assembly path)"
     
     Write-Success "Installation complete!"
-    Write-Status "Target: $TargetDir"
+    Write-Status "Manifest: $TargetManifest"
+    Write-Status "DLL: $targetDll"
     Write-Status "Please restart Revit 2025 to load the add-in."
 }
 
 function Uninstall-AddIn {
     Write-Status "Uninstalling ReBIM Copilot Add-in..."
     
+    # Remove manifest from Addins root
+    if (Test-Path $TargetManifest) {
+        Remove-Item -Path $TargetManifest -Force
+        Write-Success "Removed: $TargetManifest"
+    } else {
+        Write-Status "Manifest not found: $TargetManifest"
+    }
+    
+    # Remove ReBIM.Copilot directory
     if (Test-Path $TargetDir) {
         Remove-Item -Path $TargetDir -Recurse -Force
         Write-Success "Removed: $TargetDir"
     } else {
-        Write-Status "Add-in not installed."
+        Write-Status "Directory not found: $TargetDir"
     }
     
     Write-Success "Uninstallation complete!"
