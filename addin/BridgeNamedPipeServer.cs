@@ -1,9 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Pipes;
-using System.Security.AccessControl;
 using System.Security.Cryptography;
-using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -14,16 +12,16 @@ namespace ReBIM.Revit.Addin.Bridge
     /// <summary>
     /// Named Pipe server for RCP-02 bridge
     /// LOCAL ONLY - no TCP fallback
+    /// ONE active client connection at a time
     /// </summary>
     public class BridgeNamedPipeServer
     {
         private readonly BridgeRuntime _runtime;
         private readonly string _pipeName;
         private readonly string _token;
-        private NamedPipeServerStream _pipeServer;
+        private NamedPipeServerStream _activePipe;
         private CancellationTokenSource _cts;
         private Task _listenerTask;
-        private bool _isAuthenticated;
 
         public BridgeNamedPipeServer(BridgeRuntime runtime, string pipeName, string token)
         {
@@ -48,7 +46,7 @@ namespace ReBIM.Revit.Addin.Bridge
         public void Stop()
         {
             _cts?.Cancel();
-            _pipeServer?.Dispose();
+            _activePipe?.Dispose();
             Logger.Info("Named Pipe server stopped");
         }
 
@@ -56,9 +54,10 @@ namespace ReBIM.Revit.Addin.Bridge
         {
             while (!ct.IsCancellationRequested && !_runtime.IsStopping)
             {
+                NamedPipeServerStream pipe = null;
                 try
                 {
-                    _pipeServer = new NamedPipeServerStream(
+                    pipe = new NamedPipeServerStream(
                         _pipeName,
                         PipeDirection.InOut,
                         1,
@@ -67,10 +66,11 @@ namespace ReBIM.Revit.Addin.Bridge
                         BridgeProtocol.MaxFrameBytes,
                         BridgeProtocol.MaxFrameBytes);
 
-                    await _pipeServer.WaitForConnectionAsync(ct);
-                    _isAuthenticated = false;
+                    _activePipe = pipe;
+                    await pipe.WaitForConnectionAsync(ct);
 
-                    _ = HandleClientAsync(_pipeServer, ct);
+                    // Handle client synchronously - one at a time
+                    await HandleClientAsync(pipe, ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -80,11 +80,17 @@ namespace ReBIM.Revit.Addin.Bridge
                 {
                     Logger.Error("Named Pipe server error", ex);
                 }
+                finally
+                {
+                    pipe?.Dispose();
+                    _activePipe = null;
+                }
             }
         }
 
         private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken ct)
         {
+            var session = new BridgeClientSession();
             try
             {
                 var buffer = new byte[BridgeProtocol.MaxFrameBytes];
@@ -100,7 +106,7 @@ namespace ReBIM.Revit.Addin.Bridge
                     // Process complete frames
                     while (TryReadFrame(frameBuffer, out byte[] frameData))
                     {
-                        var response = await ProcessFrame(frameData);
+                        var response = await ProcessFrame(frameData, session);
                         byte[] responseFrame = EncodeFrame(response);
                         await pipe.WriteAsync(responseFrame, 0, responseFrame.Length, ct);
                     }
@@ -124,7 +130,12 @@ namespace ReBIM.Revit.Addin.Bridge
             byte[] data = buffer.ToArray();
             int length = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
 
-            if (length == 0 || length > BridgeProtocol.MaxFrameBytes)
+            if (length == 0)
+            {
+                throw new Exception(BridgeProtocol.MalformedFrame);
+            }
+
+            if (length > BridgeProtocol.MaxFrameBytes)
             {
                 throw new Exception(BridgeProtocol.FrameTooLarge);
             }
@@ -146,14 +157,16 @@ namespace ReBIM.Revit.Addin.Bridge
         }
 
         /// <summary>
-        /// Process a frame and return response JSON
+        /// Process a frame and return response
         /// </summary>
-        private async Task<byte[]> ProcessFrame(byte[] frameData)
+        private async Task<byte[]> ProcessFrame(byte[] frameData, BridgeClientSession session)
         {
             try
             {
-                string json = Encoding.UTF8.GetString(frameData);
-                var request = JsonSerializer.Deserialize<BridgeRequest>(json);
+                // Strict UTF-8 decoding
+                var strictUtf8 = new UTF8Encoding(false, true);
+                string json = strictUtf8.GetString(frameData);
+                var request = BridgeJson.Deserialize<BridgeRequest>(json);
 
                 if (request == null)
                 {
@@ -166,8 +179,44 @@ namespace ReBIM.Revit.Addin.Bridge
                     });
                 }
 
+                // Validate bridge version
+                if (request.BridgeVersion != BridgeProtocol.Version)
+                {
+                    return EncodeResponse(new BridgeResponse
+                    {
+                        BridgeVersion = BridgeProtocol.Version,
+                        RequestId = request.RequestId,
+                        Ok = false,
+                        Error = new BridgeError { Code = "UNSUPPORTED_BRIDGE_VERSION", Message = $"Unsupported bridge version: {request.BridgeVersion}" }
+                    });
+                }
+
+                // Validate request ID
+                if (string.IsNullOrEmpty(request.RequestId) || request.RequestId.Length > 128)
+                {
+                    return EncodeResponse(new BridgeResponse
+                    {
+                        BridgeVersion = BridgeProtocol.Version,
+                        RequestId = request.RequestId,
+                        Ok = false,
+                        Error = new BridgeError { Code = BridgeProtocol.MalformedFrame, Message = "Invalid request ID" }
+                    });
+                }
+
+                // Validate operation
+                if (string.IsNullOrEmpty(request.Operation))
+                {
+                    return EncodeResponse(new BridgeResponse
+                    {
+                        BridgeVersion = BridgeProtocol.Version,
+                        RequestId = request.RequestId,
+                        Ok = false,
+                        Error = new BridgeError { Code = BridgeProtocol.MalformedFrame, Message = "Invalid operation" }
+                    });
+                }
+
                 // Authentication check
-                if (request.Operation != BridgeOperations.Authenticate && !_isAuthenticated)
+                if (request.Operation != BridgeOperations.Authenticate && !session.IsAuthenticated)
                 {
                     return EncodeResponse(new BridgeResponse
                     {
@@ -183,7 +232,7 @@ namespace ReBIM.Revit.Addin.Bridge
                 switch (request.Operation)
                 {
                     case BridgeOperations.Authenticate:
-                        response = ProcessAuthenticate(request);
+                        response = ProcessAuthenticate(request, session);
                         break;
                     case BridgeOperations.Ping:
                         response = ProcessPing(request);
@@ -211,12 +260,12 @@ namespace ReBIM.Revit.Addin.Bridge
                     BridgeVersion = BridgeProtocol.Version,
                     RequestId = null,
                     Ok = false,
-                    Error = new BridgeError { Code = BridgeProtocol.InternalError, Message = ex.Message }
+                    Error = new BridgeError { Code = BridgeProtocol.InternalError, Message = "Internal error" }
                 });
             }
         }
 
-        private BridgeResponse ProcessAuthenticate(BridgeRequest request)
+        private BridgeResponse ProcessAuthenticate(BridgeRequest request, BridgeClientSession session)
         {
             if (string.IsNullOrEmpty(request.Token))
             {
@@ -243,7 +292,7 @@ namespace ReBIM.Revit.Addin.Bridge
                 };
             }
 
-            _isAuthenticated = true;
+            session.IsAuthenticated = true;
             return new BridgeResponse
             {
                 BridgeVersion = BridgeProtocol.Version,
@@ -302,7 +351,7 @@ namespace ReBIM.Revit.Addin.Bridge
 
         private byte[] EncodeResponse(BridgeResponse response)
         {
-            string json = JsonSerializer.Serialize(response);
+            string json = BridgeJson.Serialize(response);
             return EncodeFrame(Encoding.UTF8.GetBytes(json));
         }
 
@@ -316,5 +365,13 @@ namespace ReBIM.Revit.Addin.Bridge
             Array.Copy(data, 0, frame, 4, data.Length);
             return frame;
         }
+    }
+
+    /// <summary>
+    /// Per-connection authentication session
+    /// </summary>
+    public class BridgeClientSession
+    {
+        public bool IsAuthenticated { get; set; } = false;
     }
 }

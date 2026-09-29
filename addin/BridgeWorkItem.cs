@@ -6,6 +6,7 @@ namespace ReBIM.Revit.Addin.Bridge
 {
     /// <summary>
     /// Work item for the bounded bridge queue
+    /// Uses RunContinuationsAsynchronously to avoid running pipe continuations on Revit UI thread
     /// </summary>
     public class BridgeWorkItem
     {
@@ -22,7 +23,7 @@ namespace ReBIM.Revit.Addin.Bridge
             Operation = operation;
             CreatedAt = DateTime.UtcNow;
             Deadline = CreatedAt.AddMilliseconds(timeoutMs);
-            CompletionSource = new TaskCompletionSource<BridgeResponse>();
+            CompletionSource = new TaskCompletionSource<BridgeResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
         /// <summary>

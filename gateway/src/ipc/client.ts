@@ -1,6 +1,7 @@
 /**
  * RCP-02 IPC Client for communicating with Revit Add-in via Named Pipe
  * Uses Windows Named Pipe only - NO TCP fallback
+ * NO automatic reconnect - explicit connect/disconnect only
  */
 
 import * as net from 'net';
@@ -24,7 +25,6 @@ export class IpcClient {
     timeout: NodeJS.Timeout;
   }> = new Map();
   private buffer: Buffer = Buffer.alloc(0);
-  private reconnectTimer: NodeJS.Timeout | null = null;
   private isConnected: boolean = false;
   private isAuthenticated: boolean = false;
   private options: {
@@ -53,6 +53,7 @@ export class IpcClient {
 
     return new Promise((resolve, reject) => {
       const connectTimeout = setTimeout(() => {
+        this.socket?.destroy();
         reject(new Error('Connection timeout'));
       }, this.options.connectTimeoutMs);
 
@@ -122,39 +123,48 @@ export class IpcClient {
   }
 
   /**
-   * Handle error
+   * Handle error - reject all pending requests
    */
   private handleError(error: Error): void {
     console.error('IPC error:', error);
+    this.rejectAllPending();
     this.isConnected = false;
     this.isAuthenticated = false;
-    this.scheduleReconnect();
+    this.socket = null;
   }
 
   /**
-   * Handle close
+   * Handle close - reject all pending requests
    */
   private handleClose(): void {
+    this.rejectAllPending();
     this.isConnected = false;
     this.isAuthenticated = false;
-    this.scheduleReconnect();
+    this.socket = null;
   }
 
   /**
-   * Schedule reconnect
+   * Reject all pending requests
    */
-  private scheduleReconnect(): void {
-    if (this.reconnectTimer) return;
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      this.connect().catch(console.error);
-    }, 5000);
+  private rejectAllPending(): void {
+    for (const [id, pending] of this.pendingRequests) {
+      clearTimeout(pending.timeout);
+      pending.reject(new Error('Connection closed'));
+    }
+    this.pendingRequests.clear();
   }
 
   /**
-   * Send a request
+   * Send a bridge control request (public API)
+   * Only allowlisted operations are permitted
    */
-  private async sendRequest(operation: string, params: Record<string, unknown>): Promise<BridgeResponse> {
+  async sendRequest(operation: string, params: Record<string, unknown>): Promise<BridgeResponse> {
+    // Allowlist check
+    const allowedOperations: string[] = [BridgeOperations.Ping, BridgeOperations.ContextProbe, BridgeOperations.Authenticate];
+    if (!allowedOperations.includes(operation)) {
+      throw new Error('Semantic BIM commands are unavailable until RCP-03+.');
+    }
+
     if (!this.isConnected) {
       throw new Error('IPC not connected');
     }
@@ -180,13 +190,6 @@ export class IpcClient {
   }
 
   /**
-   * Send a bridge control request (public API)
-   */
-  async sendBridgeRequest(operation: string, params: Record<string, unknown>): Promise<BridgeResponse> {
-    return this.sendRequest(operation, params);
-  }
-
-  /**
    * Ping the bridge
    */
   async ping(): Promise<BridgeResponse> {
@@ -201,16 +204,14 @@ export class IpcClient {
   }
 
   /**
-   * Disconnect from the bridge
+   * Disconnect from the bridge (NO automatic reconnect)
    */
   async disconnect(): Promise<void> {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
     this.socket?.end();
+    this.socket = null;
     this.isConnected = false;
     this.isAuthenticated = false;
+    this.buffer = Buffer.alloc(0);
   }
 
   /**

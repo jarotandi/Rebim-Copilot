@@ -1,6 +1,6 @@
 # RCP-02 — Authenticated Local IPC + ExternalEvent Bridge
 
-**Status:** READY TO START  
+**Status:** IMPLEMENTED — STATIC VERIFICATION IN PROGRESS  
 **Branch:** `rcp-02-authenticated-ipc-external-event`  
 **Starting baseline:** `d5eb118fc3f8f84b48ee260bead9322a6609982c` (merged/sealed RCP-01)  
 **Contract baseline:** `0.1.0` — FROZEN

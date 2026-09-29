@@ -13,13 +13,11 @@ namespace ReBIM.Revit.Addin.Bridge
     {
         private readonly BridgeRuntime _runtime;
         private readonly ConcurrentQueue<BridgeWorkItem> _workQueue;
-        private readonly ManualResetEventSlim _workAvailable;
 
         public BridgeExternalEventHandler(BridgeRuntime runtime)
         {
             _runtime = runtime;
             _workQueue = new ConcurrentQueue<BridgeWorkItem>();
-            _workAvailable = new ManualResetEventSlim(false);
         }
 
         /// <summary>
@@ -30,7 +28,6 @@ namespace ReBIM.Revit.Addin.Bridge
             if (_runtime.IsStopping) return false;
 
             _workQueue.Enqueue(workItem);
-            _workAvailable.Set();
             return true;
         }
 
@@ -38,6 +35,27 @@ namespace ReBIM.Revit.Addin.Bridge
         /// Get current queue size
         /// </summary>
         public int QueueSize => _workQueue.Count;
+
+        /// <summary>
+        /// Cancel all pending work items
+        /// </summary>
+        public void CancelPending()
+        {
+            while (_workQueue.TryDequeue(out var workItem))
+            {
+                workItem.TrySetResult(new BridgeResponse
+                {
+                    BridgeVersion = BridgeProtocol.Version,
+                    RequestId = workItem.RequestId,
+                    Ok = false,
+                    Error = new BridgeError
+                    {
+                        Code = BridgeProtocol.BridgeShuttingDown,
+                        Message = "Bridge is shutting down"
+                    }
+                });
+            }
+        }
 
         /// <summary>
         /// Execute is called by Revit when ExternalEvent.Raise() is invoked
@@ -85,10 +103,6 @@ namespace ReBIM.Revit.Addin.Bridge
             {
                 Logger.Error("ExternalEvent execution failed", ex);
             }
-            finally
-            {
-                _workAvailable.Reset();
-            }
         }
 
         /// <summary>
@@ -126,7 +140,7 @@ namespace ReBIM.Revit.Addin.Bridge
                     Error = new BridgeError
                     {
                         Code = BridgeProtocol.InternalError,
-                        Message = ex.Message
+                        Message = "Internal error"
                     }
                 };
             }

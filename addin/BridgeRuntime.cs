@@ -17,6 +17,7 @@ namespace ReBIM.Revit.Addin.Bridge
         private readonly string _pipeName;
         private readonly string _token;
         private volatile bool _isStopping;
+        private readonly SemaphoreSlim _queueSemaphore;
 
         public bool IsStopping => _isStopping;
         public string PipeName => _pipeName;
@@ -25,6 +26,7 @@ namespace ReBIM.Revit.Addin.Bridge
         {
             _handler = new BridgeExternalEventHandler(this);
             _externalEvent = ExternalEvent.Create(_handler);
+            _queueSemaphore = new SemaphoreSlim(BridgeProtocol.MaxQueueSize, BridgeProtocol.MaxQueueSize);
 
             int processId = Process.GetCurrentProcess().Id;
             _pipeName = BridgeDiscovery.GeneratePipeName(processId);
@@ -63,6 +65,9 @@ namespace ReBIM.Revit.Addin.Bridge
             // Stop accepting new clients
             _pipeServer.Stop();
 
+            // Cancel all pending work items
+            _handler.CancelPending();
+
             // Remove runtime descriptor
             BridgeDiscovery.RemoveDescriptor(_pipeName);
 
@@ -71,16 +76,27 @@ namespace ReBIM.Revit.Addin.Bridge
 
         /// <summary>
         /// Enqueue work item for ExternalEvent processing
+        /// Uses semaphore for bounded queue
         /// </summary>
         public bool EnqueueWork(BridgeWorkItem workItem)
         {
             if (_isStopping) return false;
-            if (_handler.QueueSize >= BridgeProtocol.MaxQueueSize) return false;
+
+            // Try to acquire slot (non-blocking)
+            if (!_queueSemaphore.Wait(0))
+            {
+                return false;
+            }
 
             bool enqueued = _handler.EnqueueWork(workItem);
             if (enqueued)
             {
                 _externalEvent.Raise();
+            }
+            else
+            {
+                // Release slot if enqueue failed
+                _queueSemaphore.Release();
             }
             return enqueued;
         }
