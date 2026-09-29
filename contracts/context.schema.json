@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rebim.local/schemas/context.schema.json",
+  "title": "ReBIM Context Model",
+  "description": "Normalized BIM context for AI consumption",
+  "type": "object",
+  "required": ["host", "document", "view", "selection", "revision"],
+  "properties": {
+    "host": {
+      "type": "string",
+      "enum": ["revit"]
+    },
+    "document": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "version": { "type": "string" },
+        "path": { "type": "string" }
+      }
+    },
+    "view": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "selection": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "category"],
+        "properties": {
+          "id": { "type": "string" },
+          "category": { "type": "string" },
+          "family": { "type": "string" },
+          "type": { "type": "string" },
+          "level": { "type": "string" },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "value": {},
+                "unit": { "type": "string" },
+                "type": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "revision": {
+      "type": "string",
+      "description": "Context revision hash for stale detection"
+    }
+  }
+}

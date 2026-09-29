@@ -1,0 +1,90 @@
+{
+  "version": "0.1.0",
+  "tools": [
+    {
+      "name": "get_project_info",
+      "risk": "READ",
+      "modes": ["Ask", "Analyze", "Edit", "Automate"],
+      "description": "Get project metadata and session info",
+      "parameters": {}
+    },
+    {
+      "name": "get_active_view",
+      "risk": "READ",
+      "modes": ["Ask", "Analyze", "Edit", "Automate"],
+      "description": "Get current active view context",
+      "parameters": {}
+    },
+    {
+      "name": "get_selection",
+      "risk": "READ",
+      "modes": ["Ask", "Analyze", "Edit", "Automate"],
+      "description": "Get currently selected elements",
+      "parameters": {
+        "maxResults": { "type": "number", "default": 100 }
+      }
+    },
+    {
+      "name": "get_element",
+      "risk": "READ",
+      "modes": ["Ask", "Analyze", "Edit", "Automate"],
+      "description": "Get element identity and details",
+      "parameters": {
+        "elementId": { "type": "string", "required": true }
+      }
+    },
+    {
+      "name": "get_element_properties",
+      "risk": "READ",
+      "modes": ["Ask", "Analyze", "Edit", "Automate"],
+      "description": "Get parameter values for an element",
+      "parameters": {
+        "elementId": { "type": "string", "required": true }
+      }
+    },
+    {
+      "name": "find_elements",
+      "risk": "READ",
+      "modes": ["Analyze", "Edit", "Automate"],
+      "description": "Search elements with filters",
+      "parameters": {
+        "category": { "type": "string" },
+        "family": { "type": "string" },
+        "type": { "type": "string" },
+        "level": { "type": "string" },
+        "maxResults": { "type": "number", "default": 50 }
+      }
+    },
+    {
+      "name": "select_elements",
+      "risk": "UI",
+      "modes": ["Ask", "Analyze", "Edit", "Automate"],
+      "description": "Select elements by ID",
+      "parameters": {
+        "elementIds": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    {
+      "name": "highlight_elements",
+      "risk": "UI",
+      "modes": ["Ask", "Analyze", "Edit", "Automate"],
+      "description": "Highlight elements visually",
+      "parameters": {
+        "elementIds": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    {
+      "name": "set_parameter",
+      "risk": "SAFE_WRITE",
+      "modes": ["Edit", "Automate"],
+      "description": "Change one validated parameter (requires approval)",
+      "parameters": {
+        "elementId": { "type": "string", "required": true },
+        "parameter": { "type": "string", "required": true },
+        "value": { "required": true },
+        "unit": { "type": "string" },
+        "expectedCurrentValue": {}
+      }
+    }
+  ]
+}

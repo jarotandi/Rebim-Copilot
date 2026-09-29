@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rebim.local/schemas/command.schema.json",
+  "title": "ReBIM Command Envelope",
+  "description": "Command envelope for ReBIM Copilot IPC communication",
+  "type": "object",
+  "required": ["requestId", "host", "command", "arguments"],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "description": "Unique request identifier for correlation"
+    },
+    "host": {
+      "type": "string",
+      "enum": ["revit"],
+      "description": "Target host application"
+    },
+    "command": {
+      "type": "string",
+      "description": "Command/tool name to execute"
+    },
+    "contextRevision": {
+      "type": "string",
+      "description": "Context revision hash for stale detection"
+    },
+    "arguments": {
+      "type": "object",
+      "description": "Command-specific arguments"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReBIM Copilot - UI Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .sidebar-container {
+            width: 350px;
+            height: 600px;
+            background: #1e1e1e;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Header */
+        .header {
+            background: #2d2d30;
+            padding: 15px;
+            border-bottom: 1px solid #3e3e42;
+        }
+        
+        .header-title {
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .controls-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .control-group {
+            flex: 1;
+        }
+        
+        .control-label {
+            color: #cccccc;
+            font-size: 11px;
+            margin-bottom: 4px;
+            display: block;
+        }
+        
+        select {
+            width: 100%;
+            padding: 6px 10px;
+            background: #3c3c3c;
+            color: #ffffff;
+            border: 1px solid #007acc;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        select:focus {
+            outline: none;
+            border-color: #0098ff;
+        }
+        
+        /* Context Chips */
+        .context-section {
+            background: #3e3e42;
+            padding: 12px 15px;
+            border-bottom: 1px solid #2d2d30;
+        }
+        
+        .context-title {
+            color: #cccccc;
+            font-size: 11px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .chip {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .chip-view {
+            background: #007acc;
+            color: #ffffff;
+        }
+        
+        .chip-selection {
+            background: #1e1e1e;
+            color: #ffffff;
+            border: 1px solid #3e3e42;
+        }
+        
+        .chip-provider {
+            background: #2d2d30;
+            color: #4ec9b0;
+            border: 1px solid #4ec9b0;
+        }
+        
+        /* Chat History */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: #1e1e1e;
+        }
+        
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chat-container::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+        
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #3e3e42;
+            border-radius: 3px;
+        }
+        
+        .message {
+            margin-bottom: 12px;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        
+        .message-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .avatar-user {
+            background: #007acc;
+            color: #ffffff;
+        }
+        
+        .avatar-ai {
+            background: #4ec9b0;
+            color: #1e1e1e;
+        }
+        
+        .avatar-system {
+            background: #f48771;
+            color: #1e1e1e;
+        }
+        
+        .message-sender {
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .sender-user { color: #007acc; }
+        .sender-ai { color: #4ec9b0; }
+        .sender-system { color: #f48771; }
+        
+        .message-time {
+            font-size: 10px;
+            color: #6e6e6e;
+        }
+        
+        .message-content {
+            background: #2d2d30;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-left: 32px;
+        }
+        
+        .message-content.user-msg {
+            background: #094771;
+        }
+        
+        .message-content.ai-msg {
+            background: #2d2d30;
+            border-left: 3px solid #4ec9b0;
+        }
+        
+        .message-content.system-msg {
+            background: #3c2e2e;
+            border-left: 3px solid #f48771;
+        }
+        
+        /* Tool Call Card */
+        .tool-call {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 8px 0 8px 32px;
+        }
+        
+        .tool-call-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+        
+        .tool-icon {
+            width: 16px;
+            height: 16px;
+            background: #007acc;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #fff;
+        }
+        
+        .tool-name {
+            color: #4ec9b0;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .tool-status {
+            margin-left: auto;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        
+        .status-success {
+            background: #0e639c;
+            color: #ffffff;
+        }
+        
+        .tool-result {
+            color: #cccccc;
+            font-size: 11px;
+            font-family: 'Consolas', monospace;
+            background: #1e1e1e;
+            padding: 6px;
+            border-radius: 4px;
+            margin-top: 6px;
+        }
+        
+        /* Preview Card */
+        .preview-card {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 8px 0 8px 32px;
+        }
+        
+        .preview-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .preview-title {
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .preview-badge {
+            background: #0e639c;
+            color: #ffffff;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        
+        .preview-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .preview-before, .preview-after {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        
+        .preview-before {
+            background: #3c2e2e;
+            color: #f48771;
+        }
+        
+        .preview-after {
+            background: #2e3c2e;
+            color: #4ec9b0;
+        }
+        
+        .preview-label {
+            font-size: 10px;
+            color: #6e6e6e;
+            margin-bottom: 4px;
+        }
+        
+        .preview-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .preview-arrow {
+            color: #6e6e6e;
+            font-size: 20px;
+        }
+        
+        .preview-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-approve {
+            background: #0e639c;
+            color: #ffffff;
+        }
+        
+        .btn-approve:hover {
+            background: #1177bb;
+        }
+        
+        .btn-reject {
+            background: #3c2e2e;
+            color: #f48771;
+            border: 1px solid #f48771;
+        }
+        
+        .btn-reject:hover {
+            background: #4c3e3e;
+        }
+        
+        /* Input Area */
+        .input-area {
+            background: #252526;
+            padding: 12px 15px;
+            border-top: 1px solid #3e3e42;
+        }
+        
+        .input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        
+        .input-box {
+            flex: 1;
+            background: #3c3c3c;
+            border: 1px solid #007acc;
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #ffffff;
+            font-size: 13px;
+            resize: none;
+            min-height: 60px;
+            max-height: 120px;
+        }
+        
+        .input-box:focus {
+            outline: none;
+            border-color: #0098ff;
+        }
+        
+        .input-box::placeholder {
+            color: #6e6e6e;
+        }
+        
+        .send-btn {
+            width: 60px;
+            height: 60px;
+            background: #007acc;
+            border: none;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .send-btn:hover {
+            background: #0098ff;
+            transform: scale(1.05);
+        }
+        
+        .send-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 8px 0;
+        }
+        
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #4ec9b0;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.3; }
+            30% { opacity: 1; }
+        }
+        
+        /* Footer */
+        .footer {
+            background: #2d2d30;
+            padding: 8px 15px;
+            border-top: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .footer-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #6e6e6e;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4ec9b0;
+        }
+        
+        .footer-info {
+            font-size: 10px;
+            color: #6e6e6e;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-title">ReBIM Copilot</div>
+            <div class="controls-row">
+                <div class="control-group">
+                    <label class="control-label">Mode</label>
+                    <select>
+                        <option>Ask</option>
+                        <option>Analyze</option>
+                        <option selected>Edit</option>
+                        <option>Automate</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label class="control-label">Provider</label>
+                    <select>
+                        <option selected>Ollama</option>
+                        <option>OpenAI</option>
+                        <option>Claude</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Context Chips -->
+        <div class="context-section">
+            <div class="context-title">Current Context</div>
+            <div class="chips-container">
+                <span class="chip chip-view">View: Level 2 Floor Plan</span>
+                <span class="chip chip-selection">Selection: 1 element</span>
+                <span class="chip chip-provider">Local AI</span>
+            </div>
+        </div>
+        
+        <!-- Chat History -->
+        <div class="chat-container">
+            <!-- System Message -->
+            <div class="message">
+                <div class="message-header">
+                    <div class="message-avatar avatar-system">S</div>
+                    <span class="message-sender sender-system">System</span>
+                    <span class="message-time">10:30 AM</span>
+                </div>
+                <div class="message-content system-msg">
+                    ReBIM Copilot siap membantu. Pilih elemen di Revit dan tanyakan apa saja tentang model BIM Anda.
+                </div>
+            </div>
+            
+            <!-- User Message -->
+            <div class="message">
+                <div class="message-header">
+                    <div class="message-avatar avatar-user">U</div>
+                    <span class="message-sender sender-user">User</span>
+                    <span class="message-time">10:31 AM</span>
+                </div>
+                <div class="message-content user-msg">
+                    Pintu apa yang saya pilih?
+                </div>
+            </div>
+            
+            <!-- AI Tool Call -->
+            <div class="message">
+                <div class="message-header">
+                    <div class="message-avatar avatar-ai">AI</div>
+                    <span class="message-sender sender-ai">ReBIM AI</span>
+                    <span class="message-time">10:31 AM</span>
+                </div>
+                <div class="tool-call">
+                    <div class="tool-call-header">
+                        <div class="tool-icon">T</div>
+                        <span class="tool-name">get_selection</span>
+                        <span class="tool-status status-success">Success</span>
+                    </div>
+                    <div class="tool-result">
+                        { "elements": [{ "id": "183728", "category": "Doors", "family": "Single Flush", "type": "900x2100" }] }
+                    </div>
+                </div>
+                <div class="message-content ai-msg">
+                    Anda memilih pintu <strong>Single Flush 900x2100</strong> di Level 2. Pintu ini memiliki lebar 900mm dan tinggi 2100mm.
+                </div>
+            </div>
+            
+            <!-- User Message -->
+            <div class="message">
+                <div class="message-header">
+                    <div class="message-avatar avatar-user">U</div>
+                    <span class="message-sender sender-user">User</span>
+                    <span class="message-time">10:32 AM</span>
+                </div>
+                <div class="message-content user-msg">
+                    Ubah lebar pintu menjadi 1000mm
+                </div>
+            </div>
+            
+            <!-- AI Preview -->
+            <div class="message">
+                <div class="message-header">
+                    <div class="message-avatar avatar-ai">AI</div>
+                    <span class="message-sender sender-ai">ReBIM AI</span>
+                    <span class="message-time">10:32 AM</span>
+                </div>
+                <div class="preview-card">
+                    <div class="preview-header">
+                        <span class="preview-title">Parameter Change Preview</span>
+                        <span class="preview-badge">Dry Run</span>
+                    </div>
+                    <div class="preview-content">
+                        <div class="preview-before">
+                            <div class="preview-label">Current</div>
+                            <div class="preview-value">900 mm</div>
+                        </div>
+                        <div class="preview-arrow">→</div>
+                        <div class="preview-after">
+                            <div class="preview-label">Proposed</div>
+                            <div class="preview-value">1000 mm</div>
+                        </div>
+                    </div>
+                    <div class="preview-actions">
+                        <button class="btn btn-reject">Reject</button>
+                        <button class="btn btn-approve">Approve</button>
+                    </div>
+                </div>
+                <div class="message-content ai-msg">
+                    Saya akan mengubah parameter <strong>Width</strong> pintu dari 900mm menjadi 1000mm. Silakan review perubahan di atas.
+                </div>
+            </div>
+            
+            <!-- Typing Indicator -->
+            <div class="message">
+                <div class="message-header">
+                    <div class="message-avatar avatar-ai">AI</div>
+                    <span class="message-sender sender-ai">ReBIM AI</span>
+                </div>
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Input Area -->
+        <div class="input-area">
+            <div class="input-wrapper">
+                <textarea class="input-box" placeholder="Tanyakan sesuatu tentang model BIM Anda..."></textarea>
+                <button class="send-btn">Send</button>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-status">
+                <span class="status-dot"></span>
+                <span>Revit Connected</span>
+            </div>
+            <div class="footer-info">v0.1.0 POC</div>
+        </div>
+    </div>
+</body>
+</html>

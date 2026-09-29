@@ -1,0 +1,50 @@
+{
+  "version": "0.1.0",
+  "errors": [
+    {
+      "code": "REBIM_VALIDATION_ERROR",
+      "message": "Arguments/schema invalid",
+      "action": "Fix request / regenerate"
+    },
+    {
+      "code": "REBIM_CAPABILITY_UNAVAILABLE",
+      "message": "Tool unsupported by current host/mode",
+      "action": "Switch mode/host or advisory only"
+    },
+    {
+      "code": "REBIM_PERMISSION_DENIED",
+      "message": "Policy/user permission blocks action",
+      "action": "Request permission / use read-only"
+    },
+    {
+      "code": "REBIM_STALE_CONTEXT",
+      "message": "Model changed after proposal",
+      "action": "Refresh and regenerate"
+    },
+    {
+      "code": "REBIM_IPC_UNAVAILABLE",
+      "message": "Revit bridge not connected",
+      "action": "Reconnect/restart bridge"
+    },
+    {
+      "code": "REBIM_REVIT_CONTEXT_BUSY",
+      "message": "Revit not ready for action",
+      "action": "Retry when idle"
+    },
+    {
+      "code": "REBIM_EXECUTION_FAILED",
+      "message": "Handler/transaction failed",
+      "action": "Show error; model should rollback"
+    },
+    {
+      "code": "REBIM_PROVIDER_UNAVAILABLE",
+      "message": "AI provider unavailable",
+      "action": "Fallback if allowed"
+    },
+    {
+      "code": "REBIM_CLOUD_BLOCKED",
+      "message": "Privacy policy blocks cloud",
+      "action": "Use local provider"
+    }
+  ]
+}

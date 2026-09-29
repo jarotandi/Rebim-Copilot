@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rebim.local/schemas/result.schema.json",
+  "title": "ReBIM Result Envelope",
+  "description": "Result envelope for ReBIM Copilot IPC communication",
+  "type": "object",
+  "required": ["requestId", "ok"],
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "description": "Correlates to request ID"
+    },
+    "ok": {
+      "type": "boolean",
+      "description": "Whether the command succeeded"
+    },
+    "result": {
+      "description": "Command-specific result data"
+    },
+    "error": {
+      "type": "object",
+      "description": "Error details when ok is false",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "REBIM_VALIDATION_ERROR",
+            "REBIM_CAPABILITY_UNAVAILABLE",
+            "REBIM_PERMISSION_DENIED",
+            "REBIM_STALE_CONTEXT",
+            "REBIM_IPC_UNAVAILABLE",
+            "REBIM_REVIT_CONTEXT_BUSY",
+            "REBIM_EXECUTION_FAILED",
+            "REBIM_PROVIDER_UNAVAILABLE",
+            "REBIM_CLOUD_BLOCKED"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "hint": {
+          "type": "string",
+          "description": "User-facing action hint"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
