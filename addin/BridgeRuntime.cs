@@ -18,6 +18,7 @@ namespace ReBIM.Revit.Addin.Bridge
         private readonly string _token;
         private volatile bool _isStopping;
         private readonly SemaphoreSlim _queueSemaphore;
+        private bool _isDisposed;
 
         public bool IsStopping => _isStopping;
         public string PipeName => _pipeName;
@@ -60,6 +61,7 @@ namespace ReBIM.Revit.Addin.Bridge
         /// </summary>
         public void Stop()
         {
+            if (_isDisposed) return;
             _isStopping = true;
 
             // Stop accepting new clients
@@ -70,6 +72,11 @@ namespace ReBIM.Revit.Addin.Bridge
 
             // Remove runtime descriptor
             BridgeDiscovery.RemoveDescriptor(_pipeName);
+
+            // Dispose ExternalEvent and semaphore
+            _externalEvent.Dispose();
+            _queueSemaphore.Dispose();
+            _isDisposed = true;
 
             Logger.Info("Bridge runtime stopped");
         }
@@ -91,14 +98,41 @@ namespace ReBIM.Revit.Addin.Bridge
             bool enqueued = _handler.EnqueueWork(workItem);
             if (enqueued)
             {
-                _externalEvent.Raise();
+                // Raise ExternalEvent and check result
+                var raiseResult = _externalEvent.Raise();
+                if (raiseResult == ExternalEventRequest.Accepted)
+                {
+                    return true;
+                }
+                else if (raiseResult == ExternalEventRequest.Pending)
+                {
+                    // Event already pending, will process queued work
+                    return true;
+                }
+                else
+                {
+                    // Definitive rejection - release slot and fail
+                    _queueSemaphore.Release();
+                    return false;
+                }
             }
             else
             {
                 // Release slot if enqueue failed
                 _queueSemaphore.Release();
+                return false;
             }
-            return enqueued;
+        }
+
+        /// <summary>
+        /// Release a queue slot (called when work item leaves queue)
+        /// </summary>
+        internal void ReleaseQueueSlot()
+        {
+            if (!_isDisposed)
+            {
+                _queueSemaphore.Release();
+            }
         }
 
         /// <summary>

@@ -37,7 +37,7 @@ namespace ReBIM.Revit.Addin.Bridge
         public int QueueSize => _workQueue.Count;
 
         /// <summary>
-        /// Cancel all pending work items
+        /// Cancel all pending work items and release queue slots
         /// </summary>
         public void CancelPending()
         {
@@ -54,6 +54,7 @@ namespace ReBIM.Revit.Addin.Bridge
                         Message = "Bridge is shutting down"
                     }
                 });
+                _runtime.ReleaseQueueSlot();
             }
         }
 
@@ -71,26 +72,34 @@ namespace ReBIM.Revit.Addin.Bridge
                 {
                     processed++;
 
-                    // Check if expired
-                    if (workItem.IsExpired())
+                    try
                     {
-                        workItem.TrySetResult(new BridgeResponse
+                        // Check if expired
+                        if (workItem.IsExpired())
                         {
-                            BridgeVersion = BridgeProtocol.Version,
-                            RequestId = workItem.RequestId,
-                            Ok = false,
-                            Error = new BridgeError
+                            workItem.TrySetResult(new BridgeResponse
                             {
-                                Code = BridgeProtocol.RequestTimeout,
-                                Message = "Request timed out in queue"
-                            }
-                        });
-                        continue;
-                    }
+                                BridgeVersion = BridgeProtocol.Version,
+                                RequestId = workItem.RequestId,
+                                Ok = false,
+                                Error = new BridgeError
+                                {
+                                    Code = BridgeProtocol.RequestTimeout,
+                                    Message = "Request timed out in queue"
+                                }
+                            });
+                            continue;
+                        }
 
-                    // Process the work item
-                    var response = ProcessWorkItem(app, workItem);
-                    workItem.TrySetResult(response);
+                        // Process the work item
+                        var response = ProcessWorkItem(app, workItem);
+                        workItem.TrySetResult(response);
+                    }
+                    finally
+                    {
+                        // Always release queue slot
+                        _runtime.ReleaseQueueSlot();
+                    }
                 }
 
                 // Signal if more work remains

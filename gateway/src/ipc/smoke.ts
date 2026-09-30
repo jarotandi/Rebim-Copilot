@@ -46,8 +46,13 @@ async function runSmokeTest(): Promise<void> {
   console.log('\n2. Negative test: ping before authentication...');
   const descriptor = resolveDescriptor(pid);
   const rawSocket = net.createConnection(`\\\\.\\pipe\\${descriptor.pipeName}`);
+  let rawBuffer: Buffer = Buffer.alloc(0);
 
   await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('Timeout waiting for AUTH_REQUIRED'));
+    }, 5000);
+
     rawSocket.on('connect', () => {
       // Send ping without auth
       const request = JSON.stringify({
@@ -60,22 +65,27 @@ async function runSmokeTest(): Promise<void> {
     });
 
     rawSocket.on('data', (data) => {
+      rawBuffer = Buffer.concat([rawBuffer, data]);
       try {
-        const result = tryDecodeFrame(data);
+        const result = tryDecodeFrame(rawBuffer);
         if (result) {
+          rawBuffer = result.remaining;
           const response = JSON.parse(result.data.toString('utf-8'));
           assert(response.ok === false, 'Expected ok=false');
           assert(response.error?.code === BridgeErrors.AuthRequired, `Expected AUTH_REQUIRED, got ${response.error?.code}`);
-          rawSocket.end();
+          clearTimeout(timeout);
+          rawSocket.destroy();
           resolve();
         }
       } catch (e) {
-        reject(e);
+        // Continue accumulating
       }
     });
 
-    rawSocket.on('error', reject);
-    setTimeout(() => reject(new Error('Timeout')), 5000);
+    rawSocket.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
   });
 
   // 3. Authenticated connect
@@ -90,10 +100,15 @@ async function runSmokeTest(): Promise<void> {
   assert(pingResponse.ok === true, 'Ping failed');
   console.log('   PASS');
 
-  // 5. Context probe
+  // 5. Context probe with ExternalEvent assertion
   console.log('\n5. Context probe test...');
   const probeResponse = await client.contextProbe();
   assert(probeResponse.ok === true, 'Context probe failed');
+  const probeResult = probeResponse.result as { executedOnExternalEvent: boolean; revitVersion: string; revitBuild: string; hasActiveDocument: boolean };
+  assert(probeResult.executedOnExternalEvent === true, 'executedOnExternalEvent must be true');
+  assert(typeof probeResult.revitVersion === 'string' && probeResult.revitVersion.length > 0, 'revitVersion must be non-empty');
+  assert(typeof probeResult.revitBuild === 'string' && probeResult.revitBuild.length > 0, 'revitBuild must be non-empty');
+  assert(typeof probeResult.hasActiveDocument === 'boolean', 'hasActiveDocument must be boolean');
   console.log('   PASS');
 
   // 6. Sequential context probes
@@ -106,26 +121,65 @@ async function runSmokeTest(): Promise<void> {
   assert(passed === 10, `Only ${passed}/10 passed`);
   console.log(`   ${passed}/10 passed`);
 
-  // 7. Disconnect
-  console.log('\n7. Disconnecting...');
+  // 7. Burst test (8 concurrent)
+  console.log('\n7. Burst test (8 concurrent)...');
+  const burstResults = await Promise.all(
+    Array.from({ length: 8 }, () => client.contextProbe())
+  );
+  const burstPassed = burstResults.filter(r => r.ok).length;
+  assert(burstPassed === 8, `Only ${burstPassed}/8 burst passed`);
+  console.log(`   ${burstPassed}/8 passed`);
+
+  // 8. Durability loop (40 sequential)
+  console.log('\n8. Durability loop (40 sequential)...');
+  let durabilityPassed = 0;
+  for (let i = 0; i < 40; i++) {
+    const response = await client.contextProbe();
+    if (response.ok) durabilityPassed++;
+  }
+  assert(durabilityPassed === 40, `Only ${durabilityPassed}/40 durability passed`);
+  console.log(`   ${durabilityPassed}/40 passed`);
+
+  // 9. Client timeout test
+  console.log('\n9. Client timeout test...');
+  try {
+    // Use a very short timeout to force client-side timeout
+    const timeoutClient = new IpcClient({ processId: pid, requestTimeoutMs: 1 });
+    await timeoutClient.connect();
+    await timeoutClient.contextProbe();
+    assert(false, 'Expected timeout');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    assert(msg.includes('timeout') || msg.includes('Timeout'), `Expected timeout error, got: ${msg}`);
+    console.log('   PASS');
+  }
+
+  // 10. Verify client still works after timeout
+  console.log('\n10. Verify client works after timeout...');
+  const postTimeoutPing = await client.ping();
+  assert(postTimeoutPing.ok === true, 'Ping after timeout failed');
+  console.log('   PASS');
+
+  // 11. Disconnect
+  console.log('\n11. Disconnecting...');
   await client.disconnect();
   assert(!client.isConnectedToRevit(), 'Still connected after disconnect');
   console.log('   PASS');
 
-  // 8. Reconnect
-  console.log('\n8. Reconnecting...');
+  // 12. Reconnect
+  console.log('\n12. Reconnecting...');
   await client.connect();
   assert(client.isConnectedToRevit(), 'Not connected after reconnect');
   console.log('   PASS');
 
-  // 9. Ping after reconnect
-  console.log('\n9. Ping after reconnect...');
+  // 13. Ping after reconnect
+  console.log('\n13. Ping after reconnect...');
   const pingResponse2 = await client.ping();
   assert(pingResponse2.ok === true, 'Ping after reconnect failed');
   console.log('   PASS');
 
-  // 10. Final disconnect
-  console.log('\n10. Final disconnect...');
+  // 14. Final disconnect
+  console.log('\n14. Final disconnect...');
   await client.disconnect();
   assert(!client.isConnectedToRevit(), 'Still connected after final disconnect');
   console.log('   PASS');

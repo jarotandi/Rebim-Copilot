@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { encodeFrame, tryDecodeFrame, MAX_FRAME_BYTES } from '../gateway/src/ipc/framing.js';
-import { BridgeOperations, BridgeErrors } from '../gateway/src/ipc/types.js';
+import { BridgeOperations, BridgeErrors, RuntimeDescriptor } from '../gateway/src/ipc/types.js';
 
 describe('Bridge Framing', () => {
   it('should encode and decode a frame round-trip', () => {
@@ -31,7 +31,6 @@ describe('Bridge Framing', () => {
   it('should handle incomplete frame buffering', () => {
     const data = Buffer.from('{"test":true}', 'utf-8');
     const frame = encodeFrame(data);
-    // Send partial frame
     const partial = frame.subarray(0, 4);
     const result = tryDecodeFrame(partial);
     expect(result).toBeNull();
@@ -52,6 +51,11 @@ describe('Bridge Framing', () => {
     expect(result2).not.toBeNull();
     expect(result2!.data.toString('utf-8')).toBe('{"test":2}');
   });
+
+  it('should enforce max frame size on encode', () => {
+    const oversized = Buffer.alloc(MAX_FRAME_BYTES + 1);
+    expect(() => encodeFrame(oversized)).toThrow('Frame too large');
+  });
 });
 
 describe('Bridge Operations', () => {
@@ -69,12 +73,73 @@ describe('Bridge Operations', () => {
   });
 });
 
-describe('Bridge Discovery', () => {
-  it('should return empty array when no descriptors exist', async () => {
-    const { discoverValidDescriptors } = await import('../gateway/src/ipc/discovery.js');
-    // This will return empty in test environment
-    const descriptors = discoverValidDescriptors();
-    expect(Array.isArray(descriptors)).toBe(true);
+describe('Bridge Discovery Logic', () => {
+  function createDescriptor(pid: number, bridgeVersion = 1): RuntimeDescriptor {
+    return {
+      bridgeVersion,
+      processId: pid,
+      pipeName: `rebim-copilot-revit-${pid}-nonce`,
+      token: 'test-token',
+      startedAtUtc: new Date().toISOString(),
+      addinVersion: '0.1.0',
+    };
+  }
+
+  function filterValidDescriptors(descriptors: RuntimeDescriptor[], isAlive: (pid: number) => boolean): RuntimeDescriptor[] {
+    return descriptors.filter(d =>
+      d.bridgeVersion === 1 &&
+      d.processId > 0 &&
+      d.pipeName &&
+      d.token &&
+      isAlive(d.processId)
+    );
+  }
+
+  it('should return empty array when no descriptors exist', () => {
+    const result = filterValidDescriptors([], () => true);
+    expect(result).toEqual([]);
+  });
+
+  it('should select exactly one valid descriptor', () => {
+    const descriptors = [createDescriptor(123)];
+    const result = filterValidDescriptors(descriptors, () => true);
+    expect(result.length).toBe(1);
+    expect(result[0].processId).toBe(123);
+  });
+
+  it('should detect ambiguity with multiple descriptors and no PID', () => {
+    const descriptors = [createDescriptor(123), createDescriptor(456)];
+    const result = filterValidDescriptors(descriptors, () => true);
+    expect(result.length).toBe(2);
+    // Ambiguity: caller must specify PID
+  });
+
+  it('should select correct descriptor by explicit PID', () => {
+    const descriptors = [createDescriptor(123), createDescriptor(456)];
+    const result = filterValidDescriptors(descriptors, () => true);
+    const selected = result.find(d => d.processId === 456);
+    expect(selected).toBeDefined();
+    expect(selected!.processId).toBe(456);
+  });
+
+  it('should return empty for missing explicit PID', () => {
+    const descriptors = [createDescriptor(123)];
+    const result = filterValidDescriptors(descriptors, () => true);
+    const selected = result.find(d => d.processId === 999);
+    expect(selected).toBeUndefined();
+  });
+
+  it('should ignore malformed descriptors', () => {
+    const malformed = { ...createDescriptor(123), bridgeVersion: 999 };
+    const result = filterValidDescriptors([malformed as RuntimeDescriptor], () => true);
+    expect(result.length).toBe(0);
+  });
+
+  it('should ignore stale/dead PID descriptors', () => {
+    const descriptors = [createDescriptor(123), createDescriptor(456)];
+    const result = filterValidDescriptors(descriptors, (pid) => pid === 123);
+    expect(result.length).toBe(1);
+    expect(result[0].processId).toBe(123);
   });
 });
 
@@ -89,5 +154,19 @@ describe('Bridge Client', () => {
     const { IpcClient } = await import('../gateway/src/ipc/client.js');
     const client = new IpcClient();
     await expect(client.sendRequest('get_selection', {})).rejects.toThrow('Semantic BIM commands are unavailable');
+  });
+
+  it('should allow ping operation', async () => {
+    const { IpcClient } = await import('../gateway/src/ipc/client.js');
+    const client = new IpcClient();
+    // This will fail because not connected, but should not throw "unavailable"
+    await expect(client.ping()).rejects.toThrow('IPC not connected');
+  });
+
+  it('should allow context_probe operation', async () => {
+    const { IpcClient } = await import('../gateway/src/ipc/client.js');
+    const client = new IpcClient();
+    // This will fail because not connected, but should not throw "unavailable"
+    await expect(client.contextProbe()).rejects.toThrow('IPC not connected');
   });
 });

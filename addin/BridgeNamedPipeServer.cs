@@ -22,6 +22,7 @@ namespace ReBIM.Revit.Addin.Bridge
         private NamedPipeServerStream _activePipe;
         private CancellationTokenSource _cts;
         private Task _listenerTask;
+        private bool _stoppedCleanly;
 
         public BridgeNamedPipeServer(BridgeRuntime runtime, string pipeName, string token)
         {
@@ -47,6 +48,27 @@ namespace ReBIM.Revit.Addin.Bridge
         {
             _cts?.Cancel();
             _activePipe?.Dispose();
+
+            // Wait for listener task with bounded timeout
+            if (_listenerTask != null)
+            {
+                try
+                {
+                    _listenerTask.Wait(TimeSpan.FromSeconds(2));
+                    _stoppedCleanly = true;
+                }
+                catch (AggregateException)
+                {
+                    // Expected cancellation/disposal exceptions
+                    _stoppedCleanly = true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Listener stop error", ex);
+                    _stoppedCleanly = false;
+                }
+            }
+
             Logger.Info("Named Pipe server stopped");
         }
 
@@ -253,6 +275,26 @@ namespace ReBIM.Revit.Addin.Bridge
 
                 return EncodeResponse(response);
             }
+            catch (JsonException)
+            {
+                return EncodeResponse(new BridgeResponse
+                {
+                    BridgeVersion = BridgeProtocol.Version,
+                    RequestId = null,
+                    Ok = false,
+                    Error = new BridgeError { Code = BridgeProtocol.MalformedFrame, Message = "Malformed JSON" }
+                });
+            }
+            catch (DecoderFallbackException)
+            {
+                return EncodeResponse(new BridgeResponse
+                {
+                    BridgeVersion = BridgeProtocol.Version,
+                    RequestId = null,
+                    Ok = false,
+                    Error = new BridgeError { Code = BridgeProtocol.MalformedFrame, Message = "Malformed UTF-8" }
+                });
+            }
             catch (Exception ex)
             {
                 return EncodeResponse(new BridgeResponse
@@ -352,11 +394,24 @@ namespace ReBIM.Revit.Addin.Bridge
         private byte[] EncodeResponse(BridgeResponse response)
         {
             string json = BridgeJson.Serialize(response);
-            return EncodeFrame(Encoding.UTF8.GetBytes(json));
+            byte[] data = Encoding.UTF8.GetBytes(json);
+
+            // Enforce frame bounds
+            if (data.Length == 0 || data.Length > BridgeProtocol.MaxFrameBytes)
+            {
+                throw new Exception("Response frame exceeds bounds");
+            }
+
+            return EncodeFrame(data);
         }
 
         private byte[] EncodeFrame(byte[] data)
         {
+            if (data.Length == 0 || data.Length > BridgeProtocol.MaxFrameBytes)
+            {
+                throw new Exception("Frame exceeds bounds");
+            }
+
             byte[] frame = new byte[4 + data.Length];
             frame[0] = (byte)(data.Length >> 24);
             frame[1] = (byte)(data.Length >> 16);
