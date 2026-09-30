@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { encodeFrame, tryDecodeFrame, MAX_FRAME_BYTES } from '../gateway/src/ipc/framing.js';
 import { BridgeOperations, BridgeErrors, RuntimeDescriptor } from '../gateway/src/ipc/types.js';
+import { validateDescriptor, filterValidDescriptors, resolveDescriptorFromList } from '../gateway/src/ipc/discovery.js';
 
 describe('Bridge Framing', () => {
   it('should encode and decode a frame round-trip', () => {
@@ -73,7 +74,7 @@ describe('Bridge Operations', () => {
   });
 });
 
-describe('Bridge Discovery Logic', () => {
+describe('Bridge Discovery - Production Helpers', () => {
   function createDescriptor(pid: number, bridgeVersion = 1): RuntimeDescriptor {
     return {
       bridgeVersion,
@@ -85,61 +86,82 @@ describe('Bridge Discovery Logic', () => {
     };
   }
 
-  function filterValidDescriptors(descriptors: RuntimeDescriptor[], isAlive: (pid: number) => boolean): RuntimeDescriptor[] {
-    return descriptors.filter(d =>
-      d.bridgeVersion === 1 &&
-      d.processId > 0 &&
-      d.pipeName &&
-      d.token &&
-      isAlive(d.processId)
-    );
-  }
+  describe('validateDescriptor', () => {
+    it('should accept valid descriptor', () => {
+      const d = createDescriptor(123);
+      expect(validateDescriptor(d)).toBe(true);
+    });
 
-  it('should return empty array when no descriptors exist', () => {
-    const result = filterValidDescriptors([], () => true);
-    expect(result).toEqual([]);
+    it('should reject invalid version', () => {
+      const d = createDescriptor(123, 999);
+      expect(validateDescriptor(d)).toBe(false);
+    });
+
+    it('should reject empty pipe name', () => {
+      const d = createDescriptor(123);
+      d.pipeName = '';
+      expect(validateDescriptor(d)).toBe(false);
+    });
+
+    it('should reject empty token', () => {
+      const d = createDescriptor(123);
+      d.token = '';
+      expect(validateDescriptor(d)).toBe(false);
+    });
+
+    it('should reject zero PID', () => {
+      const d = createDescriptor(0);
+      expect(validateDescriptor(d)).toBe(false);
+    });
   });
 
-  it('should select exactly one valid descriptor', () => {
-    const descriptors = [createDescriptor(123)];
-    const result = filterValidDescriptors(descriptors, () => true);
-    expect(result.length).toBe(1);
-    expect(result[0].processId).toBe(123);
+  describe('filterValidDescriptors', () => {
+    it('should return empty array for empty input', () => {
+      const result = filterValidDescriptors([], () => true);
+      expect(result).toEqual([]);
+    });
+
+    it('should filter by liveness', () => {
+      const descriptors = [createDescriptor(123), createDescriptor(456)];
+      const result = filterValidDescriptors(descriptors, (pid) => pid === 123);
+      expect(result.length).toBe(1);
+      expect(result[0].processId).toBe(123);
+    });
+
+    it('should filter invalid descriptors', () => {
+      const valid = createDescriptor(123);
+      const invalid = createDescriptor(456, 999);
+      const result = filterValidDescriptors([valid, invalid], () => true);
+      expect(result.length).toBe(1);
+    });
   });
 
-  it('should detect ambiguity with multiple descriptors and no PID', () => {
-    const descriptors = [createDescriptor(123), createDescriptor(456)];
-    const result = filterValidDescriptors(descriptors, () => true);
-    expect(result.length).toBe(2);
-    // Ambiguity: caller must specify PID
-  });
+  describe('resolveDescriptorFromList', () => {
+    it('should throw for empty list', () => {
+      expect(() => resolveDescriptorFromList([], undefined)).toThrow('No valid RCP-02 Revit instance found');
+    });
 
-  it('should select correct descriptor by explicit PID', () => {
-    const descriptors = [createDescriptor(123), createDescriptor(456)];
-    const result = filterValidDescriptors(descriptors, () => true);
-    const selected = result.find(d => d.processId === 456);
-    expect(selected).toBeDefined();
-    expect(selected!.processId).toBe(456);
-  });
+    it('should select single descriptor', () => {
+      const descriptors = [createDescriptor(123)];
+      const result = resolveDescriptorFromList(descriptors, undefined);
+      expect(result.processId).toBe(123);
+    });
 
-  it('should return empty for missing explicit PID', () => {
-    const descriptors = [createDescriptor(123)];
-    const result = filterValidDescriptors(descriptors, () => true);
-    const selected = result.find(d => d.processId === 999);
-    expect(selected).toBeUndefined();
-  });
+    it('should throw for ambiguity without PID', () => {
+      const descriptors = [createDescriptor(123), createDescriptor(456)];
+      expect(() => resolveDescriptorFromList(descriptors, undefined)).toThrow('Multiple RCP-02 Revit instances found');
+    });
 
-  it('should ignore malformed descriptors', () => {
-    const malformed = { ...createDescriptor(123), bridgeVersion: 999 };
-    const result = filterValidDescriptors([malformed as RuntimeDescriptor], () => true);
-    expect(result.length).toBe(0);
-  });
+    it('should select by explicit PID', () => {
+      const descriptors = [createDescriptor(123), createDescriptor(456)];
+      const result = resolveDescriptorFromList(descriptors, 456);
+      expect(result.processId).toBe(456);
+    });
 
-  it('should ignore stale/dead PID descriptors', () => {
-    const descriptors = [createDescriptor(123), createDescriptor(456)];
-    const result = filterValidDescriptors(descriptors, (pid) => pid === 123);
-    expect(result.length).toBe(1);
-    expect(result[0].processId).toBe(123);
+    it('should throw for missing PID', () => {
+      const descriptors = [createDescriptor(123)];
+      expect(() => resolveDescriptorFromList(descriptors, 999)).toThrow('Revit instance with PID 999 not found');
+    });
   });
 });
 
@@ -159,14 +181,12 @@ describe('Bridge Client', () => {
   it('should allow ping operation', async () => {
     const { IpcClient } = await import('../gateway/src/ipc/client.js');
     const client = new IpcClient();
-    // This will fail because not connected, but should not throw "unavailable"
     await expect(client.ping()).rejects.toThrow('IPC not connected');
   });
 
   it('should allow context_probe operation', async () => {
     const { IpcClient } = await import('../gateway/src/ipc/client.js');
     const client = new IpcClient();
-    // This will fail because not connected, but should not throw "unavailable"
     await expect(client.contextProbe()).rejects.toThrow('IPC not connected');
   });
 });

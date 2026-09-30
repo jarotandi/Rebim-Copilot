@@ -54,7 +54,6 @@ async function runSmokeTest(): Promise<void> {
     }, 5000);
 
     rawSocket.on('connect', () => {
-      // Send ping without auth
       const request = JSON.stringify({
         bridgeVersion: 1,
         requestId: 'test-unauth',
@@ -121,29 +120,40 @@ async function runSmokeTest(): Promise<void> {
   assert(passed === 10, `Only ${passed}/10 passed`);
   console.log(`   ${passed}/10 passed`);
 
-  // 7. Burst test (8 concurrent)
+  // 7. Burst test (8 concurrent) with ExternalEvent assertion
   console.log('\n7. Burst test (8 concurrent)...');
   const burstResults = await Promise.all(
     Array.from({ length: 8 }, () => client.contextProbe())
   );
-  const burstPassed = burstResults.filter(r => r.ok).length;
-  assert(burstPassed === 8, `Only ${burstPassed}/8 burst passed`);
-  console.log(`   ${burstPassed}/8 passed`);
+  const burstOkCount = burstResults.filter(r => r.ok).length;
+  assert(burstOkCount === 8, `Only ${burstOkCount}/8 burst ok`);
+  const burstExternalEventCount = burstResults.filter(r => {
+    const result = r.result as { executedOnExternalEvent: boolean };
+    return result.executedOnExternalEvent === true;
+  }).length;
+  assert(burstExternalEventCount === 8, `Only ${burstExternalEventCount}/8 executedOnExternalEvent`);
+  console.log(`   ${burstOkCount}/8 ok, ${burstExternalEventCount}/8 executedOnExternalEvent`);
 
-  // 8. Durability loop (40 sequential)
+  // 8. Durability loop (40 sequential) with ExternalEvent assertion
   console.log('\n8. Durability loop (40 sequential)...');
   let durabilityPassed = 0;
+  let durabilityExternalEventPassed = 0;
   for (let i = 0; i < 40; i++) {
     const response = await client.contextProbe();
-    if (response.ok) durabilityPassed++;
+    if (response.ok) {
+      durabilityPassed++;
+      const result = response.result as { executedOnExternalEvent: boolean };
+      if (result.executedOnExternalEvent === true) durabilityExternalEventPassed++;
+    }
   }
   assert(durabilityPassed === 40, `Only ${durabilityPassed}/40 durability passed`);
-  console.log(`   ${durabilityPassed}/40 passed`);
+  assert(durabilityExternalEventPassed === 40, `Only ${durabilityExternalEventPassed}/40 executedOnExternalEvent`);
+  console.log(`   ${durabilityPassed}/40 ok, ${durabilityExternalEventPassed}/40 executedOnExternalEvent`);
 
-  // 9. Client timeout test
-  console.log('\n9. Client timeout test...');
+  // 9. Client timeout test (same active client)
+  console.log('\n9. Client timeout test (same active client)...');
   try {
-    // Use a very short timeout to force client-side timeout
+    // Use a very short timeout to force client-side timeout on SAME client
     const timeoutClient = new IpcClient({ processId: pid, requestTimeoutMs: 1 });
     await timeoutClient.connect();
     await timeoutClient.contextProbe();

@@ -4,6 +4,13 @@ using System.Threading.Tasks;
 
 namespace ReBIM.Revit.Addin.Bridge
 {
+    public enum BridgeWorkItemState
+    {
+        Queued,
+        Completed,
+        Cancelled
+    }
+
     /// <summary>
     /// Work item for the bounded bridge queue
     /// Uses RunContinuationsAsynchronously to avoid running pipe continuations on Revit UI thread
@@ -17,12 +24,17 @@ namespace ReBIM.Revit.Addin.Bridge
         public TaskCompletionSource<BridgeResponse> CompletionSource { get; }
         public bool IsCompleted => CompletionSource.Task.IsCompleted;
 
+        private BridgeWorkItemState _state;
+
+        public BridgeWorkItemState State => _state;
+
         public BridgeWorkItem(string requestId, string operation, int timeoutMs)
         {
             RequestId = requestId;
             Operation = operation;
             CreatedAt = DateTime.UtcNow;
             Deadline = CreatedAt.AddMilliseconds(timeoutMs);
+            _state = BridgeWorkItemState.Queued;
             CompletionSource = new TaskCompletionSource<BridgeResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
@@ -39,6 +51,8 @@ namespace ReBIM.Revit.Addin.Bridge
         /// </summary>
         public bool TrySetResult(BridgeResponse response)
         {
+            if (_state != BridgeWorkItemState.Queued) return false;
+            _state = BridgeWorkItemState.Completed;
             return CompletionSource.TrySetResult(response);
         }
 
@@ -47,7 +61,19 @@ namespace ReBIM.Revit.Addin.Bridge
         /// </summary>
         public bool TrySetException(Exception ex)
         {
+            if (_state != BridgeWorkItemState.Queued) return false;
+            _state = BridgeWorkItemState.Completed;
             return CompletionSource.TrySetException(ex);
+        }
+
+        /// <summary>
+        /// Try to cancel this work item
+        /// </summary>
+        public bool TryCancel(BridgeResponse response)
+        {
+            if (_state != BridgeWorkItemState.Queued) return false;
+            _state = BridgeWorkItemState.Cancelled;
+            return CompletionSource.TrySetResult(response);
         }
     }
 }

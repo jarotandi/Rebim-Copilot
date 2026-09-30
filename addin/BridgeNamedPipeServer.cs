@@ -22,7 +22,8 @@ namespace ReBIM.Revit.Addin.Bridge
         private NamedPipeServerStream _activePipe;
         private CancellationTokenSource _cts;
         private Task _listenerTask;
-        private bool _stoppedCleanly;
+
+        public bool StoppedCleanly { get; private set; }
 
         public BridgeNamedPipeServer(BridgeRuntime runtime, string pipeName, string token)
         {
@@ -54,18 +55,35 @@ namespace ReBIM.Revit.Addin.Bridge
             {
                 try
                 {
-                    _listenerTask.Wait(TimeSpan.FromSeconds(2));
-                    _stoppedCleanly = true;
+                    bool completed = _listenerTask.Wait(TimeSpan.FromSeconds(2));
+                    if (completed)
+                    {
+                        StoppedCleanly = true;
+                    }
+                    else
+                    {
+                        StoppedCleanly = false;
+                        Logger.Warning("Named Pipe listener did not stop within 2 seconds");
+                    }
                 }
-                catch (AggregateException)
+                catch (AggregateException aggEx)
                 {
-                    // Expected cancellation/disposal exceptions
-                    _stoppedCleanly = true;
+                    // Check if all inner exceptions are expected cancellation/disposal
+                    bool allExpected = true;
+                    foreach (var inner in aggEx.InnerExceptions)
+                    {
+                        if (inner is not OperationCanceledException && inner is not IOException)
+                        {
+                            allExpected = false;
+                            Logger.Error("Unexpected listener stop error", inner);
+                        }
+                    }
+                    StoppedCleanly = allExpected;
                 }
                 catch (Exception ex)
                 {
+                    StoppedCleanly = false;
                     Logger.Error("Listener stop error", ex);
-                    _stoppedCleanly = false;
                 }
             }
 

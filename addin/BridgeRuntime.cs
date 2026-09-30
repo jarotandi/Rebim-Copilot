@@ -96,31 +96,55 @@ namespace ReBIM.Revit.Addin.Bridge
             }
 
             bool enqueued = _handler.EnqueueWork(workItem);
-            if (enqueued)
+            if (!enqueued)
             {
-                // Raise ExternalEvent and check result
-                var raiseResult = _externalEvent.Raise();
-                if (raiseResult == ExternalEventRequest.Accepted)
-                {
-                    return true;
-                }
-                else if (raiseResult == ExternalEventRequest.Pending)
-                {
-                    // Event already pending, will process queued work
-                    return true;
-                }
-                else
-                {
-                    // Definitive rejection - release slot and fail
-                    _queueSemaphore.Release();
-                    return false;
-                }
-            }
-            else
-            {
-                // Release slot if enqueue failed
                 _queueSemaphore.Release();
                 return false;
+            }
+
+            // Raise ExternalEvent and check result
+            var raiseResult = _externalEvent.Raise();
+            switch (raiseResult)
+            {
+                case ExternalEventRequest.Accepted:
+                    return true;
+
+                case ExternalEventRequest.Pending:
+                    // Event already pending, will process queued work
+                    return true;
+
+                case ExternalEventRequest.Denied:
+                case ExternalEventRequest.TimedOut:
+                    // Definitive rejection - cancel work item but do NOT release permit yet
+                    // The item is still in the queue and will be drained by ExternalEvent
+                    // The handler will release the permit when it dequeues the cancelled item
+                    workItem.TryCancel(new BridgeResponse
+                    {
+                        BridgeVersion = BridgeProtocol.Version,
+                        RequestId = workItem.RequestId,
+                        Ok = false,
+                        Error = new BridgeError
+                        {
+                            Code = BridgeProtocol.RevitContextBusy,
+                            Message = "Revit context busy"
+                        }
+                    });
+                    return false;
+
+                default:
+                    // Unknown result - treat as rejection
+                    workItem.TryCancel(new BridgeResponse
+                    {
+                        BridgeVersion = BridgeProtocol.Version,
+                        RequestId = workItem.RequestId,
+                        Ok = false,
+                        Error = new BridgeError
+                        {
+                            Code = BridgeProtocol.RevitContextBusy,
+                            Message = "Revit context busy"
+                        }
+                    });
+                    return false;
             }
         }
 
@@ -140,9 +164,21 @@ namespace ReBIM.Revit.Addin.Bridge
         /// </summary>
         public void ScheduleNextEvent()
         {
-            if (!_isStopping)
+            if (_isStopping) return;
+
+            var raiseResult = _externalEvent.Raise();
+            switch (raiseResult)
             {
-                _externalEvent.Raise();
+                case ExternalEventRequest.Accepted:
+                case ExternalEventRequest.Pending:
+                    // Success or already pending - OK
+                    break;
+
+                case ExternalEventRequest.Denied:
+                case ExternalEventRequest.TimedOut:
+                    // Cannot schedule more events - fail remaining queued work
+                    _handler.CancelPending();
+                    break;
             }
         }
     }

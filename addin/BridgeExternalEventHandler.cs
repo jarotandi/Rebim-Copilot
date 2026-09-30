@@ -43,7 +43,7 @@ namespace ReBIM.Revit.Addin.Bridge
         {
             while (_workQueue.TryDequeue(out var workItem))
             {
-                workItem.TrySetResult(new BridgeResponse
+                workItem.TryCancel(new BridgeResponse
                 {
                     BridgeVersion = BridgeProtocol.Version,
                     RequestId = workItem.RequestId,
@@ -74,6 +74,12 @@ namespace ReBIM.Revit.Addin.Bridge
 
                     try
                     {
+                        // Skip already cancelled/completed items
+                        if (workItem.State != BridgeWorkItemState.Queued)
+                        {
+                            continue;
+                        }
+
                         // Check if expired
                         if (workItem.IsExpired())
                         {
@@ -97,7 +103,7 @@ namespace ReBIM.Revit.Addin.Bridge
                     }
                     finally
                     {
-                        // Always release queue slot
+                        // Always release queue slot exactly once
                         _runtime.ReleaseQueueSlot();
                     }
                 }

@@ -32,6 +32,53 @@ function isProcessRunning(processId: number): boolean {
 }
 
 /**
+ * Validate a single descriptor
+ */
+export function validateDescriptor(descriptor: RuntimeDescriptor): boolean {
+  if (descriptor.bridgeVersion !== 1) return false;
+  if (descriptor.processId <= 0) return false;
+  if (!descriptor.pipeName) return false;
+  if (!descriptor.token) return false;
+  return true;
+}
+
+/**
+ * Filter valid descriptors from a list
+ */
+export function filterValidDescriptors(
+  descriptors: RuntimeDescriptor[],
+  isAlive: (pid: number) => boolean
+): RuntimeDescriptor[] {
+  return descriptors.filter(d => validateDescriptor(d) && isAlive(d.processId));
+}
+
+/**
+ * Resolve descriptor from a list
+ */
+export function resolveDescriptorFromList(
+  descriptors: RuntimeDescriptor[],
+  targetProcessId?: number
+): RuntimeDescriptor {
+  if (descriptors.length === 0) {
+    throw new Error('No valid RCP-02 Revit instance found');
+  }
+
+  if (targetProcessId !== undefined) {
+    const match = descriptors.find(d => d.processId === targetProcessId);
+    if (!match) {
+      throw new Error(`Revit instance with PID ${targetProcessId} not found`);
+    }
+    return match;
+  }
+
+  if (descriptors.length > 1) {
+    throw new Error('Multiple RCP-02 Revit instances found. Please specify a processId.');
+  }
+
+  return descriptors[0];
+}
+
+/**
  * Discover valid runtime descriptors
  */
 export function discoverValidDescriptors(): RuntimeDescriptor[] {
@@ -49,12 +96,7 @@ export function discoverValidDescriptors(): RuntimeDescriptor[] {
         const content = fs.readFileSync(filePath, 'utf-8');
         const descriptor = JSON.parse(content) as RuntimeDescriptor;
 
-        if (descriptor.bridgeVersion !== 1) continue;
-        if (descriptor.processId <= 0) continue;
-        if (!descriptor.pipeName) continue;
-        if (!descriptor.token) continue;
-
-        // Check if process is still running
+        if (!validateDescriptor(descriptor)) continue;
         if (!isProcessRunning(descriptor.processId)) continue;
 
         valid.push(descriptor);
@@ -74,22 +116,5 @@ export function discoverValidDescriptors(): RuntimeDescriptor[] {
  */
 export function resolveDescriptor(targetProcessId?: number): RuntimeDescriptor {
   const descriptors = discoverValidDescriptors();
-
-  if (descriptors.length === 0) {
-    throw new Error('No valid RCP-02 Revit instance found');
-  }
-
-  if (targetProcessId !== undefined) {
-    const match = descriptors.find(d => d.processId === targetProcessId);
-    if (!match) {
-      throw new Error(`Revit instance with PID ${targetProcessId} not found`);
-    }
-    return match;
-  }
-
-  if (descriptors.length > 1) {
-    throw new Error('Multiple RCP-02 Revit instances found. Please specify a processId.');
-  }
-
-  return descriptors[0];
+  return resolveDescriptorFromList(descriptors, targetProcessId);
 }
