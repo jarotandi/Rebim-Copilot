@@ -76,7 +76,8 @@ async function runSmokeTest(): Promise<void> {
             resolve();
           }
         } catch (e) {
-          // Continue accumulating
+          clearTimeout(timeout);
+          reject(e);
         }
       });
 
@@ -152,15 +153,18 @@ async function runSmokeTest(): Promise<void> {
   assert(durabilityExternalEventPassed === 40, `Only ${durabilityExternalEventPassed}/40 executedOnExternalEvent`);
   console.log(`   ${durabilityPassed}/40 ok, ${durabilityExternalEventPassed}/40 executedOnExternalEvent`);
 
-  // 9. Same-client request timeout test
+  // 9. Same-client request timeout test (deterministic)
   console.log('\n9. Same-client request timeout test...');
+  client.pauseInboundForTests();
   try {
-    await client.contextProbe({ timeoutMs: 0 });
+    await client.contextProbe({ timeoutMs: 50 });
     assert(false, 'Expected timeout');
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     assert(msg.includes('IPC request timeout'), `Expected IPC request timeout, got: ${msg}`);
     console.log('   PASS');
+  } finally {
+    client.resumeInboundForTests();
   }
 
   // 10. Pending count after timeout

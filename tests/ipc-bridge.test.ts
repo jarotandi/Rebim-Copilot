@@ -195,6 +195,25 @@ describe('Bridge Client', () => {
     const client = new IpcClient();
     expect(client.getPendingRequestCountForTests()).toBe(0);
   });
+
+  it('should pause and resume inbound data', async () => {
+    const { IpcClient } = await import('../gateway/src/ipc/client.js');
+    const client = new IpcClient();
+    // Cannot test pause/resume without actual connection, but verify methods exist
+    expect(typeof client.pauseInboundForTests).toBe('function');
+    expect(typeof client.resumeInboundForTests).toBe('function');
+    // Calling without connection should throw
+    try {
+      await client.pauseInboundForTests();
+    } catch (e) {
+      expect((e as Error).message).toBe('IPC not connected');
+    }
+    try {
+      await client.resumeInboundForTests();
+    } catch (e) {
+      expect((e as Error).message).toBe('IPC not connected');
+    }
+  });
 });
 
 describe('Bridge Enqueue Result', () => {

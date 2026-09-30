@@ -244,6 +244,27 @@ export class IpcClient {
   }
 
   /**
+   * Pause inbound data processing (for deterministic timeout testing)
+   * Pauses the socket so responses are buffered but not processed
+   */
+  pauseInboundForTests(): void {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('IPC not connected');
+    }
+    this.socket.pause();
+  }
+
+  /**
+   * Resume inbound data processing after pause
+   */
+  resumeInboundForTests(): void {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('IPC not connected');
+    }
+    this.socket.resume();
+  }
+
+  /**
    * Compatibility method for MCP/agent - NOT for RCP-02 use
    * Semantic BIM commands are unavailable until RCP-03+
    */
