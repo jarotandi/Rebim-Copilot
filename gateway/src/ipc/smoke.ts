@@ -24,8 +24,7 @@ function parseArgs(): { pid?: number } {
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
-    console.error(`   FAIL: ${message}`);
-    process.exit(1);
+    throw new Error(message);
   }
   console.log(`   PASS`);
 }
@@ -48,44 +47,47 @@ async function runSmokeTest(): Promise<void> {
   const rawSocket = net.createConnection(`\\\\.\\pipe\\${descriptor.pipeName}`);
   let rawBuffer: Buffer = Buffer.alloc(0);
 
-  await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error('Timeout waiting for AUTH_REQUIRED'));
-    }, 5000);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timeout waiting for AUTH_REQUIRED'));
+      }, 5000);
 
-    rawSocket.on('connect', () => {
-      const request = JSON.stringify({
-        bridgeVersion: 1,
-        requestId: 'test-unauth',
-        operation: 'ping',
+      rawSocket.on('connect', () => {
+        const request = JSON.stringify({
+          bridgeVersion: 1,
+          requestId: 'test-unauth',
+          operation: 'ping',
+        });
+        const frame = encodeFrame(Buffer.from(request, 'utf-8'));
+        rawSocket.write(frame);
       });
-      const frame = encodeFrame(Buffer.from(request, 'utf-8'));
-      rawSocket.write(frame);
-    });
 
-    rawSocket.on('data', (data) => {
-      rawBuffer = Buffer.concat([rawBuffer, data]);
-      try {
-        const result = tryDecodeFrame(rawBuffer);
-        if (result) {
-          rawBuffer = result.remaining;
-          const response = JSON.parse(result.data.toString('utf-8'));
-          assert(response.ok === false, 'Expected ok=false');
-          assert(response.error?.code === BridgeErrors.AuthRequired, `Expected AUTH_REQUIRED, got ${response.error?.code}`);
-          clearTimeout(timeout);
-          rawSocket.destroy();
-          resolve();
+      rawSocket.on('data', (data) => {
+        rawBuffer = Buffer.concat([rawBuffer, data]);
+        try {
+          const result = tryDecodeFrame(rawBuffer);
+          if (result) {
+            rawBuffer = result.remaining;
+            const response = JSON.parse(result.data.toString('utf-8'));
+            assert(response.ok === false, 'Expected ok=false');
+            assert(response.error?.code === BridgeErrors.AuthRequired, `Expected AUTH_REQUIRED, got ${response.error?.code}`);
+            clearTimeout(timeout);
+            resolve();
+          }
+        } catch (e) {
+          // Continue accumulating
         }
-      } catch (e) {
-        // Continue accumulating
-      }
-    });
+      });
 
-    rawSocket.on('error', (err) => {
-      clearTimeout(timeout);
-      reject(err);
+      rawSocket.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
     });
-  });
+  } finally {
+    rawSocket.destroy();
+  }
 
   // 3. Authenticated connect
   console.log('\n3. Connecting with authentication...');
@@ -150,46 +152,57 @@ async function runSmokeTest(): Promise<void> {
   assert(durabilityExternalEventPassed === 40, `Only ${durabilityExternalEventPassed}/40 executedOnExternalEvent`);
   console.log(`   ${durabilityPassed}/40 ok, ${durabilityExternalEventPassed}/40 executedOnExternalEvent`);
 
-  // 9. Client timeout test (same active client)
-  console.log('\n9. Client timeout test (same active client)...');
+  // 9. Same-client request timeout test
+  console.log('\n9. Same-client request timeout test...');
   try {
-    // Use a very short timeout to force client-side timeout on SAME client
-    const timeoutClient = new IpcClient({ processId: pid, requestTimeoutMs: 1 });
-    await timeoutClient.connect();
-    await timeoutClient.contextProbe();
+    await client.contextProbe({ timeoutMs: 0 });
     assert(false, 'Expected timeout');
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    assert(msg.includes('timeout') || msg.includes('Timeout'), `Expected timeout error, got: ${msg}`);
+    assert(msg.includes('IPC request timeout'), `Expected IPC request timeout, got: ${msg}`);
     console.log('   PASS');
   }
 
-  // 10. Verify client still works after timeout
-  console.log('\n10. Verify client works after timeout...');
+  // 10. Pending count after timeout
+  console.log('\n10. Pending count after timeout...');
+  const pendingCount = client.getPendingRequestCountForTests();
+  assert(pendingCount === 0, `Expected 0 pending, got ${pendingCount}`);
+  console.log('   PASS');
+
+  // 11. Ping after timeout
+  console.log('\n11. Ping after timeout...');
   const postTimeoutPing = await client.ping();
   assert(postTimeoutPing.ok === true, 'Ping after timeout failed');
   console.log('   PASS');
 
-  // 11. Disconnect
-  console.log('\n11. Disconnecting...');
+  // 12. Normal context probe after timeout
+  console.log('\n12. Normal context probe after timeout...');
+  const postTimeoutProbe = await client.contextProbe();
+  assert(postTimeoutProbe.ok === true, 'Context probe after timeout failed');
+  const postTimeoutResult = postTimeoutProbe.result as { executedOnExternalEvent: boolean };
+  assert(postTimeoutResult.executedOnExternalEvent === true, 'executedOnExternalEvent must be true after timeout');
+  console.log('   PASS');
+
+  // 13. Disconnect
+  console.log('\n13. Disconnecting...');
   await client.disconnect();
   assert(!client.isConnectedToRevit(), 'Still connected after disconnect');
   console.log('   PASS');
 
-  // 12. Reconnect
-  console.log('\n12. Reconnecting...');
+  // 14. Reconnect
+  console.log('\n14. Reconnecting...');
   await client.connect();
   assert(client.isConnectedToRevit(), 'Not connected after reconnect');
   console.log('   PASS');
 
-  // 13. Ping after reconnect
-  console.log('\n13. Ping after reconnect...');
+  // 15. Ping after reconnect
+  console.log('\n15. Ping after reconnect...');
   const pingResponse2 = await client.ping();
   assert(pingResponse2.ok === true, 'Ping after reconnect failed');
   console.log('   PASS');
 
-  // 14. Final disconnect
-  console.log('\n14. Final disconnect...');
+  // 16. Final disconnect
+  console.log('\n16. Final disconnect...');
   await client.disconnect();
   assert(!client.isConnectedToRevit(), 'Still connected after final disconnect');
   console.log('   PASS');

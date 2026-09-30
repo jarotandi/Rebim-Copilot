@@ -83,23 +83,26 @@ namespace ReBIM.Revit.Addin.Bridge
 
         /// <summary>
         /// Enqueue work item for ExternalEvent processing
-        /// Uses semaphore for bounded queue
+        /// Returns explicit result reason
         /// </summary>
-        public bool EnqueueWork(BridgeWorkItem workItem)
+        public BridgeEnqueueResult EnqueueWork(BridgeWorkItem workItem)
         {
-            if (_isStopping) return false;
+            if (_isStopping)
+            {
+                return BridgeEnqueueResult.ShuttingDown;
+            }
 
             // Try to acquire slot (non-blocking)
             if (!_queueSemaphore.Wait(0))
             {
-                return false;
+                return BridgeEnqueueResult.QueueFull;
             }
 
             bool enqueued = _handler.EnqueueWork(workItem);
             if (!enqueued)
             {
                 _queueSemaphore.Release();
-                return false;
+                return BridgeEnqueueResult.ShuttingDown;
             }
 
             // Raise ExternalEvent and check result
@@ -107,44 +110,23 @@ namespace ReBIM.Revit.Addin.Bridge
             switch (raiseResult)
             {
                 case ExternalEventRequest.Accepted:
-                    return true;
+                    return BridgeEnqueueResult.Accepted;
 
                 case ExternalEventRequest.Pending:
                     // Event already pending, will process queued work
-                    return true;
+                    return BridgeEnqueueResult.Accepted;
 
                 case ExternalEventRequest.Denied:
                 case ExternalEventRequest.TimedOut:
-                    // Definitive rejection - cancel work item but do NOT release permit yet
-                    // The item is still in the queue and will be drained by ExternalEvent
-                    // The handler will release the permit when it dequeues the cancelled item
-                    workItem.TryCancel(new BridgeResponse
-                    {
-                        BridgeVersion = BridgeProtocol.Version,
-                        RequestId = workItem.RequestId,
-                        Ok = false,
-                        Error = new BridgeError
-                        {
-                            Code = BridgeProtocol.RevitContextBusy,
-                            Message = "Revit context busy"
-                        }
-                    });
-                    return false;
+                    // Definitive rejection - fail ALL pending work deterministically
+                    // This ensures no orphan items and no permit leaks
+                    _handler.CancelPending();
+                    return BridgeEnqueueResult.RevitContextBusy;
 
                 default:
                     // Unknown result - treat as rejection
-                    workItem.TryCancel(new BridgeResponse
-                    {
-                        BridgeVersion = BridgeProtocol.Version,
-                        RequestId = workItem.RequestId,
-                        Ok = false,
-                        Error = new BridgeError
-                        {
-                            Code = BridgeProtocol.RevitContextBusy,
-                            Message = "Revit context busy"
-                        }
-                    });
-                    return false;
+                    _handler.CancelPending();
+                    return BridgeEnqueueResult.RevitContextBusy;
             }
         }
 

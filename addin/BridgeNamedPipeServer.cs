@@ -378,34 +378,74 @@ namespace ReBIM.Revit.Addin.Bridge
             // Enqueue work item for ExternalEvent processing
             var workItem = new BridgeWorkItem(request.RequestId, BridgeOperations.ContextProbe, BridgeProtocol.ContextProbeTimeoutMs);
 
-            if (!_runtime.EnqueueWork(workItem))
-            {
-                return new BridgeResponse
-                {
-                    BridgeVersion = BridgeProtocol.Version,
-                    RequestId = request.RequestId,
-                    Ok = false,
-                    Error = new BridgeError { Code = BridgeProtocol.QueueFull, Message = "Queue is full" }
-                };
-            }
+            var enqueueResult = _runtime.EnqueueWork(workItem);
 
-            // Wait for completion with timeout
-            try
+            // Map enqueue result to response
+            switch (enqueueResult)
             {
-                var response = await workItem.CompletionSource.Task
-                    .WaitAsync(TimeSpan.FromMilliseconds(BridgeProtocol.ContextProbeTimeoutMs));
+                case BridgeEnqueueResult.Accepted:
+                    // Wait for completion with timeout
+                    try
+                    {
+                        var response = await workItem.CompletionSource.Task
+                            .WaitAsync(TimeSpan.FromMilliseconds(BridgeProtocol.ContextProbeTimeoutMs));
+                        return response;
+                    }
+                    catch (TimeoutException)
+                    {
+                        return new BridgeResponse
+                        {
+                            BridgeVersion = BridgeProtocol.Version,
+                            RequestId = request.RequestId,
+                            Ok = false,
+                            Error = new BridgeError { Code = BridgeProtocol.RequestTimeout, Message = "Request timed out" }
+                        };
+                    }
 
-                return response;
-            }
-            catch (TimeoutException)
-            {
-                return new BridgeResponse
-                {
-                    BridgeVersion = BridgeProtocol.Version,
-                    RequestId = request.RequestId,
-                    Ok = false,
-                    Error = new BridgeError { Code = BridgeProtocol.RequestTimeout, Message = "Request timed out" }
-                };
+                case BridgeEnqueueResult.QueueFull:
+                    return new BridgeResponse
+                    {
+                        BridgeVersion = BridgeProtocol.Version,
+                        RequestId = request.RequestId,
+                        Ok = false,
+                        Error = new BridgeError { Code = BridgeProtocol.QueueFull, Message = "Queue is full" }
+                    };
+
+                case BridgeEnqueueResult.ShuttingDown:
+                    return new BridgeResponse
+                    {
+                        BridgeVersion = BridgeProtocol.Version,
+                        RequestId = request.RequestId,
+                        Ok = false,
+                        Error = new BridgeError { Code = BridgeProtocol.BridgeShuttingDown, Message = "Bridge is shutting down" }
+                    };
+
+                case BridgeEnqueueResult.RevitContextBusy:
+                    // Return the precise response from the cancelled work item if available
+                    if (workItem.IsCompleted)
+                    {
+                        try
+                        {
+                            return await workItem.CompletionSource.Task;
+                        }
+                        catch { /* fall through to default */ }
+                    }
+                    return new BridgeResponse
+                    {
+                        BridgeVersion = BridgeProtocol.Version,
+                        RequestId = request.RequestId,
+                        Ok = false,
+                        Error = new BridgeError { Code = BridgeProtocol.RevitContextBusy, Message = "Revit context busy" }
+                    };
+
+                default:
+                    return new BridgeResponse
+                    {
+                        BridgeVersion = BridgeProtocol.Version,
+                        RequestId = request.RequestId,
+                        Ok = false,
+                        Error = new BridgeError { Code = BridgeProtocol.InternalError, Message = "Internal error" }
+                    };
             }
         }
 

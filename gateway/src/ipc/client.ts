@@ -16,6 +16,10 @@ export interface IpcClientOptions {
   requestTimeoutMs?: number;
 }
 
+export interface RequestOptions {
+  timeoutMs?: number;
+}
+
 export class IpcClient {
   private socket: net.Socket | null = null;
   private token: string = '';
@@ -157,8 +161,9 @@ export class IpcClient {
   /**
    * Send a bridge control request (public API)
    * Only allowlisted operations are permitted
+   * Supports per-request timeout override for testing
    */
-  async sendRequest(operation: string, params: Record<string, unknown>): Promise<BridgeResponse> {
+  async sendRequest(operation: string, params: Record<string, unknown>, timeoutMs?: number): Promise<BridgeResponse> {
     // Allowlist check
     const allowedOperations: string[] = [BridgeOperations.Ping, BridgeOperations.ContextProbe, BridgeOperations.Authenticate];
     if (!allowedOperations.includes(operation)) {
@@ -177,11 +182,13 @@ export class IpcClient {
       ...params,
     };
 
+    const effectiveTimeout = timeoutMs ?? this.options.requestTimeoutMs;
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(requestId);
         reject(new Error('IPC request timeout'));
-      }, this.options.requestTimeoutMs);
+      }, effectiveTimeout);
 
       this.pendingRequests.set(requestId, { resolve, reject, timeout });
       const frame = encodeFrame(Buffer.from(JSON.stringify(request), 'utf-8'));
@@ -198,9 +205,10 @@ export class IpcClient {
 
   /**
    * Context probe - returns bounded host diagnostics
+   * Supports per-request timeout override for testing
    */
-  async contextProbe(): Promise<BridgeResponse> {
-    return this.sendRequest(BridgeOperations.ContextProbe, {});
+  async contextProbe(options?: RequestOptions): Promise<BridgeResponse> {
+    return this.sendRequest(BridgeOperations.ContextProbe, {}, options?.timeoutMs);
   }
 
   /**
@@ -226,5 +234,20 @@ export class IpcClient {
    */
   getDiscoveredDescriptors() {
     return discoverValidDescriptors();
+  }
+
+  /**
+   * Get pending request count for tests
+   */
+  getPendingRequestCountForTests(): number {
+    return this.pendingRequests.size;
+  }
+
+  /**
+   * Compatibility method for MCP/agent - NOT for RCP-02 use
+   * Semantic BIM commands are unavailable until RCP-03+
+   */
+  async sendBridgeRequest(_operation: string, _params: Record<string, unknown>): Promise<never> {
+    throw new Error('Semantic BIM commands are unavailable until RCP-03+.');
   }
 }

@@ -42,6 +42,17 @@ namespace ReBIM.Revit.Addin.Bridge
     }
 
     /// <summary>
+    /// Enqueue result reasons
+    /// </summary>
+    public enum BridgeEnqueueResult
+    {
+        Accepted,
+        QueueFull,
+        ShuttingDown,
+        RevitContextBusy
+    }
+
+    /// <summary>
     /// Bridge request frame
     /// </summary>
     public class BridgeRequest
