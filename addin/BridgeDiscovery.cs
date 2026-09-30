@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace ReBIM.Revit.Addin.Bridge
 {
@@ -95,9 +94,9 @@ namespace ReBIM.Revit.Addin.Bridge
             string fileName = $"revit-{processId}-{Guid.NewGuid():N}.json";
             string filePath = Path.Combine(RuntimeDirectory, fileName);
 
-            // Write atomically
+            // Write atomically using canonical bridge JSON (camelCase)
             string tempFile = filePath + ".tmp";
-            string json = JsonSerializer.Serialize(descriptor, new JsonSerializerOptions { WriteIndented = true });
+            string json = BridgeJson.Serialize(descriptor);
             File.WriteAllText(tempFile, json);
             File.Move(tempFile, filePath);
 
@@ -118,7 +117,7 @@ namespace ReBIM.Revit.Addin.Bridge
                     try
                     {
                         string json = File.ReadAllText(file);
-                        var descriptor = JsonSerializer.Deserialize<RuntimeDescriptor>(json);
+                        var descriptor = BridgeJson.DeserializeOrNull<RuntimeDescriptor>(json);
                         if (descriptor?.PipeName == pipeName)
                         {
                             File.Delete(file);
@@ -147,7 +146,7 @@ namespace ReBIM.Revit.Addin.Bridge
                     try
                     {
                         string json = File.ReadAllText(file);
-                        var descriptor = JsonSerializer.Deserialize<RuntimeDescriptor>(json);
+                        var descriptor = BridgeJson.DeserializeOrNull<RuntimeDescriptor>(json);
 
                         if (descriptor == null) continue;
                         if (descriptor.BridgeVersion != BridgeProtocol.Version) continue;
