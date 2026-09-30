@@ -146,8 +146,7 @@ namespace ReBIM.Revit.Addin.Bridge
                     // Process complete frames
                     while (TryReadFrame(frameBuffer, out byte[] frameData))
                     {
-                        var response = await ProcessFrame(frameData, session);
-                        byte[] responseFrame = EncodeFrame(response);
+                        byte[] responseFrame = await ProcessFrame(frameData, session);
                         await pipe.WriteAsync(responseFrame, 0, responseFrame.Length, ct);
                     }
                 }
