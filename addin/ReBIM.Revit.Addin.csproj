@@ -54,4 +54,6 @@
     <Resource Include="Resources\*.png" />
   </ItemGroup>
 
+  <!-- RCP-02 Bridge files are included by default SDK globbing -->
+
 </Project>

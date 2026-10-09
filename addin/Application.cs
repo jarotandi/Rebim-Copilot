@@ -1,6 +1,7 @@
 using System;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.DB;
+using ReBIM.Revit.Addin.Bridge;
 
 namespace ReBIM.Revit.Addin
 {
@@ -13,6 +14,8 @@ namespace ReBIM.Revit.Addin
         // FROZEN GUIDs - DO NOT CHANGE (generated 2026-09-29)
         public static readonly string AddInId = "e18ae9d3-e8f8-4ae9-b7ac-80467cad65c6";
         public static readonly string DockablePaneId = "d3b005f6-7e7b-4381-83ea-1c7415544db9";
+
+        private BridgeRuntime _bridgeRuntime;
 
         public Result OnStartup(UIControlledApplication application)
         {
@@ -75,6 +78,11 @@ namespace ReBIM.Revit.Addin
                     new DockablePaneProvider());
                 Logger.Info("DockablePane registered");
 
+                // Start RCP-02 bridge runtime
+                _bridgeRuntime = new BridgeRuntime();
+                _bridgeRuntime.Start();
+                Logger.Info("RCP-02 bridge runtime started");
+
                 Logger.Info("ReBIM Copilot Add-in started successfully");
                 return Result.Succeeded;
             }
@@ -90,6 +98,11 @@ namespace ReBIM.Revit.Addin
             try
             {
                 Logger.Info("ReBIM Copilot Add-in shutting down...");
+
+                // Stop bridge runtime
+                _bridgeRuntime?.Stop();
+                _bridgeRuntime = null;
+
                 Logger.Info("ReBIM Copilot Add-in shutdown complete");
                 return Result.Succeeded;
             }
