@@ -247,7 +247,11 @@ describe('Bridge Client Lifecycle', () => {
     const client = new IpcClient({ processId: 999999, connectTimeoutMs: 5000 });
 
     // connect() should reject with descriptor error
-    await expect(client.connect()).rejects.toThrow('Revit instance with PID 999999 not found');
+    // In CI (no Revit): "No valid RCP-02 Revit instance found"
+    // Local (valid descriptors exist): "Revit instance with PID 999999 not found"
+    await expect(client.connect()).rejects.toThrow(
+      /Revit instance with PID 999999 not found|No valid RCP-02 Revit instance found/
+    );
 
     // State should be clean
     expect(client.isConnectedToRevit()).toBe(false);
