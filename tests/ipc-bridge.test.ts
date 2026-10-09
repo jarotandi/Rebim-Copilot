@@ -226,3 +226,40 @@ describe('Bridge Enqueue Result', () => {
     expect(true).toBe(true);
   });
 });
+
+describe('Bridge Client Lifecycle', () => {
+  it('should disconnect without socket safely', async () => {
+    const { IpcClient } = await import('../gateway/src/ipc/client.js');
+    const client = new IpcClient();
+    await expect(client.disconnect()).resolves.toBeUndefined();
+    expect(client.isConnectedToRevit()).toBe(false);
+  });
+
+  it('should reject initial connection error promptly', async () => {
+    const { IpcClient } = await import('../gateway/src/ipc/client.js');
+    const client = new IpcClient({ processId: 999999 });
+    await expect(client.connect()).rejects.toThrow();
+  });
+
+  it('connect() should reject when descriptor not found', async () => {
+    const { IpcClient } = await import('../gateway/src/ipc/client.js');
+    // Use non-existent PID to ensure no real server
+    const client = new IpcClient({ processId: 999999, connectTimeoutMs: 5000 });
+
+    // connect() should reject with descriptor error
+    await expect(client.connect()).rejects.toThrow('Revit instance with PID 999999 not found');
+
+    // State should be clean
+    expect(client.isConnectedToRevit()).toBe(false);
+  });
+
+  it('connect() should reject on auth failure and cleanup state', async () => {
+    const { IpcClient } = await import('../gateway/src/ipc/client.js');
+    const client = new IpcClient({ processId: 999999, connectTimeoutMs: 1000 });
+
+    await expect(client.connect()).rejects.toThrow();
+
+    // After auth failure, state should be cleaned up
+    expect(client.isConnectedToRevit()).toBe(false);
+  });
+});

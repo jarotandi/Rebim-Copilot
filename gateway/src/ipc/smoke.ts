@@ -193,9 +193,34 @@ async function runSmokeTest(): Promise<void> {
   assert(!client.isConnectedToRevit(), 'Still connected after disconnect');
   console.log('   PASS');
 
-  // 14. Reconnect
+  // 14. Reconnect with bounded retry/backoff
   console.log('\n14. Reconnecting...');
-  await client.connect();
+  const maxReconnectAttempts = 5;
+  const baseDelayMs = 50;
+  let reconnectSuccess = false;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxReconnectAttempts; attempt++) {
+    try {
+      await client.connect();
+      if (client.isConnectedToRevit()) {
+        console.log(`   PASS (attempt ${attempt})`);
+        break;
+      }
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      const isTransient = e instanceof Error &&
+        (e.message.includes('ENOENT') || e.message.includes('ECONNREFUSED'));
+      if (attempt < maxReconnectAttempts && isTransient) {
+        const delayMs = 50 * Math.pow(2, attempt - 1); // 50, 100, 200, 400
+        console.log(`   Attempt ${attempt} failed (${e instanceof Error ? e.message : String(e)}), retrying in ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      } else {
+        throw e;
+      }
+    }
+  }
   assert(client.isConnectedToRevit(), 'Not connected after reconnect');
   console.log('   PASS');
 

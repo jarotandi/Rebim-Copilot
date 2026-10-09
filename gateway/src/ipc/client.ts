@@ -48,31 +48,72 @@ export class IpcClient {
 
   /**
    * Connect to the Revit add-in via Named Pipe
+   * Resolves ONLY after: socket connected + authentication ok + isAuthenticated === true
    */
   async connect(): Promise<void> {
-    // Resolve descriptor
-    const descriptor = resolveDescriptor(this.options.processId);
-    this.pipeName = descriptor.pipeName;
-    this.token = descriptor.token;
-
     return new Promise((resolve, reject) => {
+      // Resolve descriptor inside promise executor
+      let descriptor;
+      try {
+        descriptor = resolveDescriptor(this.options.processId);
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      this.pipeName = descriptor.pipeName;
+      this.token = descriptor.token;
+
       const connectTimeout = setTimeout(() => {
         this.socket?.destroy();
         reject(new Error('Connection timeout'));
       }, this.options.connectTimeoutMs);
+
+      let connectSettled = false;
+
+      const resolveOnce = () => {
+        if (connectSettled) return;
+        connectSettled = true;
+        clearTimeout(connectTimeout);
+        resolve(undefined);
+      };
+
+      const rejectOnce = (error: Error) => {
+        if (connectSettled) return;
+        connectSettled = true;
+        clearTimeout(connectTimeout);
+        reject(error);
+      };
 
       try {
         // Connect to Windows Named Pipe
         this.socket = net.createConnection(`\\\\.\\pipe\\${this.pipeName}`);
 
         this.socket.on('connect', () => {
-          clearTimeout(connectTimeout);
           this.isConnected = true;
-          this.authenticate().then(resolve).catch(reject);
+          // DO NOT resolve here - wait for authentication
+          this.authenticate()
+            .then(() => {
+              if (this.isAuthenticated) {
+                resolveOnce();
+              } else {
+                rejectOnce(new Error('Authentication succeeded but isAuthenticated is false'));
+              }
+            })
+            .catch((err) => {
+              // Authentication failed - cleanup
+              this.isConnected = false;
+              this.isAuthenticated = false;
+              this.socket?.destroy();
+              this.socket = null;
+              rejectOnce(err);
+            });
         });
 
         this.socket.on('data', (data) => this.handleData(data));
-        this.socket.on('error', (err) => this.handleError(err));
+        this.socket.on('error', (err) => {
+          this.handleError(err);
+          rejectOnce(err);
+        });
         this.socket.on('close', () => this.handleClose());
       } catch (error) {
         clearTimeout(connectTimeout);
@@ -213,10 +254,41 @@ export class IpcClient {
 
   /**
    * Disconnect from the bridge (NO automatic reconnect)
+   * Waits for the socket to actually close before resolving.
    */
   async disconnect(): Promise<void> {
-    this.socket?.end();
-    this.socket = null;
+    const socket = this.socket;
+
+    if (!socket) {
+      this.isConnected = false;
+      this.isAuthenticated = false;
+      this.buffer = Buffer.alloc(0);
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      let settled = false;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve();
+      };
+
+      const timeout = setTimeout(() => {
+        socket.destroy();
+        finish();
+      }, 1000);
+
+      socket.once('close', finish);
+      socket.end();
+    });
+
+    if (this.socket === socket) {
+      this.socket = null;
+    }
+
     this.isConnected = false;
     this.isAuthenticated = false;
     this.buffer = Buffer.alloc(0);
